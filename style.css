@@ -887,6 +887,19 @@ body.weather-rainy .rain-particles {
   border-radius: 4px;
   font-size: 0.7rem !important;
   font-weight: 600;
+  transition: var(--transition-fast);
+}
+
+.pwa-badge.clickable {
+  cursor: pointer;
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+.pwa-badge.clickable:hover {
+  background: var(--theme-accent);
+  color: #0f172a;
 }
 
 /* TOASTS NOTIFICATIONS */

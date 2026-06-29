@@ -2,6 +2,9 @@
  * AuraWeather - Lógica Principal (Premium Javascript)
  */
 
+// Variable global para controlar la instalación de la PWA
+let deferredPrompt = null;
+
 // Estado de la aplicación
 const AppState = {
   currentCity: {
@@ -818,3 +821,72 @@ function updateWeatherEffects(weatherClass, isDay) {
     bg.appendChild(container);
   }
 }
+
+// ==========================================
+// CONTROL DE INSTALACIÓN PWA (PROGRAMÁTICO)
+// ==========================================
+
+// Capturar el evento de instalación que envía el navegador
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevenir que el navegador muestre su propio banner automático
+  e.preventDefault();
+  // Guardar el evento para dispararlo más tarde
+  deferredPrompt = e;
+  
+  // Buscar el badge del footer
+  const pwaBadge = document.querySelector('.pwa-badge');
+  if (pwaBadge) {
+    pwaBadge.classList.add('clickable');
+    pwaBadge.textContent = 'Instalar AuraWeather';
+    pwaBadge.title = 'Instalar como aplicación en tu dispositivo';
+    
+    // Remover listener viejo por si acaso y añadir el nuevo
+    pwaBadge.removeEventListener('click', triggerPWAInstall);
+    pwaBadge.addEventListener('click', triggerPWAInstall);
+  }
+});
+
+// Función para ejecutar la instalación cuando hagan clic
+function triggerPWAInstall() {
+  if (!deferredPrompt) {
+    showToast('La app ya está instalada o tu navegador no soporta instalación directa.', 'info');
+    return;
+  }
+  
+  // Mostrar el banner de instalación guardado
+  deferredPrompt.prompt();
+  
+  // Analizar la respuesta del usuario
+  deferredPrompt.userChoice.then((choiceResult) => {
+    if (choiceResult.outcome === 'accepted') {
+      console.log('El usuario aceptó instalar AuraWeather.');
+      showToast('¡Instalación iniciada!', 'check');
+    } else {
+      console.log('El usuario rechazó instalar AuraWeather.');
+    }
+    
+    // Limpiar el prompt guardado ya que solo se puede usar una vez
+    deferredPrompt = null;
+    
+    // Devolver el badge a su estado original
+    const pwaBadge = document.querySelector('.pwa-badge');
+    if (pwaBadge) {
+      pwaBadge.classList.remove('clickable');
+      pwaBadge.textContent = 'Versión PWA Instalable';
+      pwaBadge.title = '';
+    }
+  });
+}
+
+// Escuchar cuando la app se haya instalado con éxito
+window.addEventListener('appinstalled', (evt) => {
+  console.log('AuraWeather instalada con éxito.');
+  showToast('¡Aplicación instalada con éxito!', 'check-circle');
+  
+  // Limpiar el botón
+  const pwaBadge = document.querySelector('.pwa-badge');
+  if (pwaBadge) {
+    pwaBadge.classList.remove('clickable');
+    pwaBadge.textContent = 'AuraWeather Instalada';
+  }
+});
