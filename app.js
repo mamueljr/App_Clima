@@ -235,7 +235,7 @@ function getUserLocation() {
       console.error('Error de geolocalización:', error);
       showToast('Permiso de ubicación denegado o error de señal', 'alert-circle');
     },
-    { enableHighAccuracy: true, timeout: 8000 }
+    { enableHighAccuracy: true, timeout: 15000 }
   );
 }
 
@@ -688,7 +688,7 @@ function detectUserLocationAutomatically() {
     (error) => {
       console.warn('Geolocalización automática denegada o fallida:', error);
     },
-    { enableHighAccuracy: false, timeout: 6000 }
+    { enableHighAccuracy: false, timeout: 15000 }
   );
 }
 

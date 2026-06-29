@@ -2,7 +2,7 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v1';
+const CACHE_NAME = 'aura-weather-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,8 +11,8 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
-  // Lucide Icons y Chart.js CDN (guardados en caché para uso sin conexión)
-  'https://unpkg.com/lucide@latest',
+  // URL fijas y directas sin redirección para asegurar el funcionamiento de cache.addAll
+  'https://cdn.jsdelivr.net/npm/lucide@0.400.0/dist/umd/lucide.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
@@ -53,7 +53,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          // Si falla y no hay red, podríamos retornar una respuesta vacía o un json de error amigable
           return new Response(JSON.stringify({ error: "Sin conexión a internet" }), {
             headers: { 'Content-Type': 'application/json' }
           });
@@ -71,8 +70,9 @@ self.addEventListener('fetch', (event) => {
         }
 
         return fetch(event.request).then((networkResponse) => {
-          // Validar respuesta correcta antes de guardar en caché
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          // Validar respuesta correcta antes de guardar en caché (permitir basic y cors)
+          if (!networkResponse || networkResponse.status !== 200 || 
+              (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
             return networkResponse;
           }
 
@@ -86,7 +86,6 @@ self.addEventListener('fetch', (event) => {
         });
       })
       .catch(() => {
-        // Retorno de fallback en caso de error total (ej: offline y recurso no cacheado)
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
