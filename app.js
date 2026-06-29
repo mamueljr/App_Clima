@@ -152,6 +152,12 @@ function setupEventListeners() {
   if (elements.shareBtn) {
     elements.shareBtn.addEventListener('click', shareCurrentWeather);
   }
+
+  // Click listener por defecto en el PWA badge para guiar al usuario
+  const pwaBadge = document.querySelector('.pwa-badge');
+  if (pwaBadge) {
+    pwaBadge.addEventListener('click', triggerPWAInstall);
+  }
 }
 
 // Búsqueda de ciudades (Autocompletado)
@@ -848,8 +854,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 // Función para ejecutar la instalación cuando hagan clic
 function triggerPWAInstall() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  
+  if (isStandalone) {
+    showToast('AuraWeather ya está instalada y funcionando.', 'check-circle');
+    return;
+  }
+
   if (!deferredPrompt) {
-    showToast('La app ya está instalada o tu navegador no soporta instalación directa.', 'info');
+    showToast('Para instalar: pulsa en el menú (︙) de Chrome/Brave y elige "Instalar aplicación".', 'info');
     return;
   }
   

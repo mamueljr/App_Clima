@@ -2,7 +2,7 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v2';
+const CACHE_NAME = 'aura-weather-cache-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,13 +10,10 @@ const ASSETS_TO_CACHE = [
   './app.js',
   './manifest.json',
   './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png',
-  // URL fijas y directas sin redirección para asegurar el funcionamiento de cache.addAll
-  'https://cdn.jsdelivr.net/npm/lucide@0.400.0/dist/umd/lucide.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js'
+  './assets/icons/icon-512.png'
 ];
 
-// Evento Install: Guardar recursos estáticos en caché
+// Evento Install: Guardar recursos estáticos locales en caché (100% de éxito garantizado)
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -76,7 +73,7 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
 
-          // Clonar la respuesta para guardarla en la caché dinámica
+          // Clonar la respuesta para guardarla en la caché dinámica (aquí se guardan Lucide y Chart.js)
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
