@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuraWeather - Tu Pronóstico Premium</title>
+  
+  <!-- Capturador de errores global para depuración en vivo -->
+  <script>
+    window.addEventListener('error', function(e) {
+      console.error("Error capturado:", e);
+      const errDiv = document.createElement('div');
+      errDiv.style.position = 'fixed';
+      errDiv.style.top = '0';
+      errDiv.style.left = '0';
+      errDiv.style.width = '100%';
+      errDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.95)';
+      errDiv.style.color = 'white';
+      errDiv.style.padding = '1rem';
+      errDiv.style.zIndex = '99999';
+      errDiv.style.fontFamily = 'monospace';
+      errDiv.style.whiteSpace = 'pre-wrap';
+      errDiv.innerHTML = '<strong>JavaScript Error:</strong> ' + e.message + '<br><small>en ' + e.filename + ':' + e.lineno + '</small>';
+      document.body.appendChild(errDiv);
+    });
+  </script>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="AuraWeather: Consulta y predice el clima de cualquier ciudad con un diseño premium, dinámico y en tiempo real. Instálalo como PWA.">
+  <meta name="theme-color" content="#0f172a">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <!-- Google Fonts - Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons (Premium & Clean) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js for beautiful charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="weather-clear-day"> <!-- La clase cambia dinámicamente según el clima -->
+  
+  <!-- Fondo animado/dinámico en CSS -->
+  <div class="dynamic-background">
+    <div class="cloud-particles"></div>
+    <div class="rain-particles"></div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- HEADER & BÚSQUEDA -->
+    <header class="app-header">
+      <div class="logo-area">
+        <i data-lucide="cloud-sun" class="logo-icon"></i>
+        <h1>AuraWeather</h1>
+      </div>
+      
+      <div class="search-box-container">
+        <div class="search-bar">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="city-search" placeholder="Busca una ciudad (ej. Madrid)..." autocomplete="off">
+          <button id="geo-btn" title="Usar mi ubicación actual">
+            <i data-lucide="map-pin"></i>
+          </button>
+        </div>
+        <!-- Resultados del autocompletado -->
+        <ul id="search-results" class="search-results hidden"></ul>
+      </div>
+      
+      <!-- Acciones de Header -->
+      <div class="header-actions">
+        <button id="unit-toggle-btn" class="unit-toggle-btn" title="Cambiar a °F">
+          °C
+        </button>
+        <button id="favorites-toggle-btn" class="favorites-toggle-btn">
+          <i data-lucide="star"></i>
+          <span>Favoritos</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BANNER DE FAVORITOS DESPLEGABLE -->
+    <section id="favorites-bar" class="favorites-bar hidden">
+      <div class="favorites-container">
+        <h3>Tus Ciudades Guardadas</h3>
+        <div id="favorites-list" class="favorites-list">
+          <!-- Ciudades favoritas inyectadas por JS -->
+          <p class="no-favorites">No tienes ciudades favoritas guardadas.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENSAJE DE BIENVENIDA / CARGA -->
+    <div id="status-message" class="status-message">
+      <div class="spinner"></div>
+      <p>Cargando información del clima...</p>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL DE LA APP (OCULTO DURANTE LA CARGA INICIAL) -->
+    <main id="main-content" class="main-content hidden">
+      
+      <!-- GRID SUPERIOR: CLIMA ACTUAL Y RECOMENDACIÓN -->
+      <div class="top-grid">
+        
+        <!-- TARJETA CLIMA ACTUAL -->
+        <section class="card current-weather-card">
+          <div class="card-header-actions">
+            <span class="location-name" id="weather-location">Madrid, España</span>
+            <div class="action-buttons-group">
+              <button id="share-btn" class="share-action-btn" title="Compartir clima">
+                <i data-lucide="share-2" class="share-icon"></i>
+              </button>
+              <button id="favorite-btn" class="favorite-action-btn" title="Guardar en favoritos">
+                <i data-lucide="star" class="star-icon"></i>
+              </button>
+            </div>
+          </div>
+          <p id="local-time" class="local-time">Lunes, 12:00 PM</p>
+          
+          <div class="weather-main-display">
+            <div class="weather-temp-container">
+              <span id="current-temp" class="current-temp">24</span>
+              <span class="temp-unit">°C</span>
+            </div>
+            <div class="weather-icon-description">
+              <div id="main-weather-icon-container">
+                <i data-lucide="sun" class="main-weather-icon text-yellow-500"></i>
+              </div>
+              <span id="weather-desc" class="weather-desc">Soleado</span>
+            </div>
+          </div>
+          
+          <div class="temp-range">
+            <span>Máx: <strong id="temp-max">28°C</strong></span>
+            <span class="divider">|</span>
+            <span>Mín: <strong id="temp-min">15°C</strong></span>
+          </div>
+        </section>
+
+        <!-- TARJETA DE RECOMENDACIONES CLIMÁTICAS INTELIGENTES -->
+        <section class="card insight-card">
+          <div class="insight-header">
+            <i data-lucide="sparkles" class="insight-icon"></i>
+            <h3>Aura Insight</h3>
+          </div>
+          <p id="insight-text" class="insight-text">
+            Cargando recomendaciones para tu día...
+          </p>
+          <div class="insight-details">
+            <div class="detail-item">
+              <i data-lucide="droplets"></i>
+              <div class="detail-text">
+                <span class="detail-label">Prob. de Lluvia</span>
+                <span id="rain-chance" class="detail-val">10%</span>
+              </div>
+            </div>
+            <div class="detail-item">
+              <i data-lucide="sun"></i>
+              <div class="detail-text">
+                <span class="detail-label">Índice UV Máximo</span>
+                <span id="uv-index" class="detail-val">Alta (6)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- SECCIÓN MÉTRICAS ADICIONALES (FLEX / GRID) -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon-wrapper humidity">
+            <i data-lucide="droplets"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Humedad</span>
+            <span id="humidity-val" class="metric-value">45%</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-wrapper wind">
+            <i data-lucide="wind"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Viento</span>
+            <span id="wind-val" class="metric-value">12 km/h</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-wrapper feels-like">
+            <i data-lucide="thermometer"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Sensación Térmica</span>
+            <span id="feels-like-val" class="metric-value">25°C</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-wrapper pressure">
+            <i data-lucide="gauge"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Presión</span>
+            <span id="pressure-val" class="metric-value">1015 hPa</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- GRÁFICO DE PRONÓSTICO POR HORAS -->
+      <section class="card chart-card">
+        <div class="card-header">
+          <h3>Pronóstico de las Próximas 24 Horas</h3>
+          <span class="badge">Temperatura & Humedad</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="hourlyChart"></canvas>
+        </div>
+      </section>
+
+      <!-- PRONÓSTICO DE 7 DÍAS -->
+      <section class="card forecast-7day-card">
+        <div class="card-header">
+          <h3>Pronóstico de 7 Días</h3>
+        </div>
+        <div id="forecast-list" class="forecast-list">
+          <!-- Generado dinámicamente por JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="app-footer">
+      <p>Desarrollado con <i data-lucide="heart" class="heart-icon"></i> por <a href="https://mamueljr.github.io/esiscom/" target="_blank" class="footer-link">ESISCOM</a></p>
+      <p class="pwa-badge">Versión PWA Instalable</p>
+    </footer>
+
+  </div>
+
+  <!-- TOAST NOTIFICATIONS PARA FEEDBACK PREMIUM -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Script principal -->
+  <script src="app.js"></script>
+  
+  <!-- Registro de PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+          .catch(err => console.error('Fallo al registrar Service Worker:', err));
+      });
+    }
+  </script>
+</body>
+</html>
