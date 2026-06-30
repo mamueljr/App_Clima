@@ -44,6 +44,10 @@
   <!-- Chart.js for beautiful charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
+  <!-- Leaflet CSS & JS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="weather-clear-day"> <!-- La clase cambia dinámicamente según el clima -->
@@ -172,6 +176,60 @@
           </div>
         </section>
 
+        <!-- TARJETA DE ASTRONOMÍA -->
+        <section class="card astronomy-card">
+          <div class="insight-header">
+            <i data-lucide="moon-star" class="insight-icon text-indigo-400"></i>
+            <h3>Sol y Luna</h3>
+          </div>
+          <div class="sun-arc-container">
+            <div class="sun-arc-visual">
+              <svg viewBox="0 0 100 50" class="sun-arc-svg">
+                <!-- Arc representing sun path -->
+                <path d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="rgba(255,255,255,0.15)" stroke-dasharray="3 3" stroke-width="1.5"/>
+                <!-- Glow node representing Sun -->
+                <circle id="sun-node" cx="10" cy="45" r="4" fill="#fbbf24" filter="url(#sun-glow)"/>
+                <defs>
+                  <filter id="sun-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+              </svg>
+              <!-- Labels for Sunrise and Sunset at the ends of the arc -->
+              <div class="sun-times-labels">
+                <span id="sunrise-time-label">--:--</span>
+                <span id="sunset-time-label">--:--</span>
+              </div>
+            </div>
+          </div>
+          <div class="astro-details">
+            <div class="astro-detail-item">
+              <i data-lucide="sunrise"></i>
+              <div class="astro-detail-text">
+                <span class="detail-label">Amanecer</span>
+                <span id="sunrise-val" class="detail-val">--:--</span>
+              </div>
+            </div>
+            <div class="astro-detail-item">
+              <i data-lucide="sunset"></i>
+              <div class="astro-detail-text">
+                <span class="detail-label">Atardecer</span>
+                <span id="sunset-val" class="detail-val">--:--</span>
+              </div>
+            </div>
+            <div class="astro-detail-item moon-detail">
+              <div id="moon-phase-icon-container">
+                <i data-lucide="moon" id="moon-phase-icon"></i>
+              </div>
+              <div class="astro-detail-text">
+                <span class="detail-label" id="moon-phase-label">Luna</span>
+                <span id="moon-illumination-val" class="detail-val">--% Iluminada</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- SECCIÓN MÉTRICAS ADICIONALES (FLEX / GRID) -->
@@ -225,6 +283,20 @@
         </div>
         <div class="chart-wrapper">
           <canvas id="hourlyChart"></canvas>
+        </div>
+      </section>
+
+      <!-- TARJETA RADAR CLIMÁTICO INTERACTIVO -->
+      <section class="card radar-card">
+        <div class="card-header">
+          <div class="radar-header-title">
+            <i data-lucide="map" class="radar-icon text-sky-400"></i>
+            <h3>Radar de Precipitación Interactivo</h3>
+          </div>
+          <span class="badge">Lluvia en vivo</span>
+        </div>
+        <div class="radar-map-wrapper">
+          <div id="radar-map"></div>
         </div>
       </section>
 

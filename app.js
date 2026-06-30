@@ -4,6 +4,8 @@
 
 // Variable global para controlar la instalación de la PWA
 let deferredPrompt = null;
+let radarMap = null;
+let radarLayer = null;
 
 // Estado de la aplicación
 const AppState = {
@@ -78,7 +80,15 @@ const elements = {
   forecastList: document.getElementById('forecast-list'),
   toastContainer: document.getElementById('toast-container'),
   unitToggleBtn: document.getElementById('unit-toggle-btn'),
-  shareBtn: document.getElementById('share-btn')
+  shareBtn: document.getElementById('share-btn'),
+  sunriseTimeLabel: document.getElementById('sunrise-time-label'),
+  sunsetTimeLabel: document.getElementById('sunset-time-label'),
+  sunriseVal: document.getElementById('sunrise-val'),
+  sunsetVal: document.getElementById('sunset-val'),
+  moonPhaseIconContainer: document.getElementById('moon-phase-icon-container'),
+  moonPhaseLabel: document.getElementById('moon-phase-label'),
+  moonIlluminationVal: document.getElementById('moon-illumination-val'),
+  sunNode: document.getElementById('sun-node')
 };
 
 // Inicialización al cargar la página
@@ -343,6 +353,12 @@ function renderWeather(data, cityName) {
   
   // Actualizar efectos animados de partículas (lluvia / nieve)
   updateWeatherEffects(codeInfo.class, current.is_day);
+  
+  // 10. Actualizar astronomía (Sol y Luna)
+  updateAstronomy(data);
+  
+  // 11. Actualizar mapa de radar interactivo
+  updateRadarMap(data.latitude, data.longitude);
   
   // Re-procesar iconos de Lucide
   safeCreateIcons();
@@ -903,3 +919,189 @@ window.addEventListener('appinstalled', (evt) => {
     pwaBadge.textContent = 'AuraWeather Instalada';
   }
 });
+
+// 10. Actualizar astronomía (Sol y Luna)
+function updateAstronomy(data) {
+  const daily = data.daily;
+  const current = data.current;
+  
+  if (!daily || !daily.sunrise || !daily.sunset) return;
+  
+  const sunriseStr = daily.sunrise[0];
+  const sunsetStr = daily.sunset[0];
+  
+  // Formateador interno para mostrar las horas del sol de forma legible
+  const formatTimeStr = (isoStr) => {
+    if (!isoStr) return '--:--';
+    const date = new Date(isoStr);
+    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+  
+  const sunriseFormatted = formatTimeStr(sunriseStr);
+  const sunsetFormatted = formatTimeStr(sunsetStr);
+  
+  // Mostrar valores textuales
+  if (elements.sunriseVal) elements.sunriseVal.textContent = sunriseFormatted;
+  if (elements.sunsetVal) elements.sunsetVal.textContent = sunsetFormatted;
+  
+  // Mostrar etiquetas cortas de los extremos del arco (sin AM/PM)
+  const stripAmPm = (str) => str.replace(/\s*[a-zA-Z\.]+$/, '').trim();
+  if (elements.sunriseTimeLabel) elements.sunriseTimeLabel.textContent = stripAmPm(sunriseFormatted);
+  if (elements.sunsetTimeLabel) elements.sunsetTimeLabel.textContent = stripAmPm(sunsetFormatted);
+  
+  // Calcular la posición del sol en el arco visual
+  const now = new Date();
+  const sunriseTime = new Date(sunriseStr);
+  const sunsetTime = new Date(sunsetStr);
+  const sunNode = elements.sunNode;
+  
+  if (sunNode) {
+    if (now >= sunriseTime && now <= sunsetTime) {
+      // El sol está arriba
+      const totalDaylight = sunsetTime.getTime() - sunriseTime.getTime();
+      const currentDaylight = now.getTime() - sunriseTime.getTime();
+      const progress = currentDaylight / totalDaylight; // Fracción entre 0 y 1
+      
+      // Ángulo de semicírculo en grados (180 a 0)
+      const angleDeg = 180 - (progress * 180);
+      const angleRad = (angleDeg * Math.PI) / 180;
+      
+      // Radio del arco es 40, centro en (50, 45) en base al viewBox del SVG
+      const cx = 50 + 40 * Math.cos(angleRad);
+      const cy = 45 - 40 * Math.sin(angleRad);
+      
+      sunNode.setAttribute('cx', cx.toFixed(1));
+      sunNode.setAttribute('cy', cy.toFixed(1));
+      sunNode.style.display = 'block';
+    } else {
+      // Es de noche, ocultamos el sol del arco diurno
+      sunNode.style.display = 'none';
+    }
+  }
+  
+  // Calcular fase lunar
+  const moonInfo = calculateMoonPhase(now);
+  if (elements.moonPhaseLabel) elements.moonPhaseLabel.textContent = moonInfo.phaseName;
+  if (elements.moonIlluminationVal) elements.moonIlluminationVal.textContent = `${moonInfo.illumination}% Iluminada`;
+  
+  // Actualizar icono de fase lunar
+  const moonIconContainer = elements.moonPhaseIconContainer;
+  if (moonIconContainer) {
+    let iconName = 'moon';
+    if (moonInfo.phaseName === 'Luna Nueva') {
+      iconName = 'moon';
+    } else if (moonInfo.phaseName.includes('Creciente')) {
+      iconName = 'cloud-moon';
+    } else if (moonInfo.phaseName === 'Luna Llena') {
+      iconName = 'sparkles';
+    } else {
+      iconName = 'moon-star';
+    }
+    moonIconContainer.innerHTML = `<i data-lucide="${iconName}" id="moon-phase-icon"></i>`;
+  }
+}
+
+// Algoritmo matemático simplificado para calcular la fase lunar y porcentaje
+function calculateMoonPhase(date) {
+  // Conocida Luna Nueva: 7 de Enero de 1970 20:35 UTC
+  const knownNewMoon = new Date(1970, 0, 7, 20, 35, 0).getTime();
+  const msPerCycle = 29.530588853 * 24 * 60 * 60 * 1000;
+  
+  let diff = date.getTime() - knownNewMoon;
+  let cycleProgress = (diff % msPerCycle) / msPerCycle;
+  if (cycleProgress < 0) cycleProgress += 1;
+  
+  let phaseName = "";
+  let illumination = 0;
+  
+  if (cycleProgress < 0.03 || cycleProgress > 0.97) {
+    phaseName = "Luna Nueva";
+    illumination = 0;
+  } else if (cycleProgress >= 0.03 && cycleProgress < 0.22) {
+    phaseName = "Creciente Cóncava";
+    illumination = Math.round(cycleProgress * 200);
+  } else if (cycleProgress >= 0.22 && cycleProgress < 0.28) {
+    phaseName = "Cuarto Creciente";
+    illumination = 50;
+  } else if (cycleProgress >= 0.28 && cycleProgress < 0.47) {
+    phaseName = "Gíbosa Creciente";
+    illumination = Math.round(cycleProgress * 200);
+  } else if (cycleProgress >= 0.47 && cycleProgress < 0.53) {
+    phaseName = "Luna Llena";
+    illumination = 100;
+  } else if (cycleProgress >= 0.53 && cycleProgress < 0.72) {
+    phaseName = "Gíbosa Menguante";
+    illumination = Math.round((1 - cycleProgress) * 200);
+  } else if (cycleProgress >= 0.72 && cycleProgress < 0.78) {
+    phaseName = "Cuarto Menguante";
+    illumination = 50;
+  } else {
+    phaseName = "Menguante Cóncava";
+    illumination = Math.round((1 - cycleProgress) * 200);
+  }
+  
+  illumination = Math.max(0, Math.min(100, illumination));
+  
+  return { phaseName, illumination };
+}
+
+// 11. Actualizar mapa de radar interactivo
+async function updateRadarMap(lat, lon) {
+  // Validar si Leaflet está cargado
+  if (typeof L === 'undefined') {
+    console.warn('La librería Leaflet no está cargada. Omitiendo radar.');
+    return;
+  }
+  
+  try {
+    const mapDiv = document.getElementById('radar-map');
+    if (!mapDiv) return;
+    
+    // Si no está inicializado, crearlo
+    if (!radarMap) {
+      radarMap = L.map('radar-map', {
+        zoomControl: true,
+        attributionControl: true,
+        scrollWheelZoom: false
+      }).setView([lat, lon], 8);
+      
+      // Capa base oscura (CartoDB Dark Matter)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(radarMap);
+    } else {
+      radarMap.setView([lat, lon], 8);
+    }
+    
+    // Forzar redibujado de tamaño
+    setTimeout(() => {
+      if (radarMap) radarMap.invalidateSize();
+    }, 200);
+    
+    // Consultar el último timestamp de radar de RainViewer
+    const rvResponse = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    if (!rvResponse.ok) throw new Error('Error al obtener datos de RainViewer');
+    
+    const rvData = await rvResponse.json();
+    if (rvData && rvData.radar && rvData.radar.past && rvData.radar.past.length > 0) {
+      const latestRadar = rvData.radar.past[rvData.radar.past.length - 1];
+      const timestamp = latestRadar.time;
+      
+      // Eliminar capa de radar anterior si existe
+      if (radarLayer) {
+        radarMap.removeLayer(radarLayer);
+      }
+      
+      // Añadir la nueva capa del radar de RainViewer
+      const radarUrl = `https://tilecache.rainviewer.com/v2/radar/${timestamp}/256/{z}/{x}/{y}/2/1_1.png`;
+      radarLayer = L.tileLayer(radarUrl, {
+        opacity: 0.6,
+        attribution: '&copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
+      }).addTo(radarMap);
+    }
+  } catch (error) {
+    console.error('Error al actualizar el radar de clima:', error);
+  }
+}

@@ -951,6 +951,147 @@ body.weather-rainy .rain-particles {
   100% { opacity: 1; }
 }
 
+/* TARJETA DE ASTRONOMÍA */
+.astronomy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.sun-arc-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.25rem 0;
+  position: relative;
+}
+.sun-arc-visual {
+  width: 100%;
+  max-width: 220px;
+  position: relative;
+}
+.sun-arc-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.sun-times-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  padding: 0 0.5rem;
+  font-family: var(--font-body);
+}
+.astro-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: auto;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 1rem;
+}
+.astro-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+}
+.astro-detail-item i {
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+}
+.astro-detail-item.moon-detail i {
+  color: #a5b4fc;
+}
+.astro-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.astro-detail-text .detail-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.astro-detail-text .detail-val {
+  font-family: var(--font-title);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* TARJETA RADAR CLIMÁTICO */
+.radar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.radar-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.radar-header-title i {
+  width: 20px;
+  height: 20px;
+}
+.radar-map-wrapper {
+  width: 100%;
+  height: 350px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+#radar-map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: #0f172a;
+}
+
+/* Personalización de Leaflet para encajar con Glassmorphism */
+.leaflet-bar {
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+.leaflet-bar a {
+  background-color: var(--glass-bg) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  transition: var(--transition-fast);
+}
+.leaflet-bar a:hover {
+  background-color: var(--glass-highlight) !important;
+  color: var(--theme-accent) !important;
+}
+.leaflet-container .leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.7) !important;
+  color: var(--text-muted) !important;
+  font-size: 0.65rem !important;
+  backdrop-filter: blur(5px);
+  padding: 0 5px;
+}
+.leaflet-container .leaflet-control-attribution a {
+  color: var(--theme-accent) !important;
+}
+
+/* Configuración de top-grid de 3 columnas en pantallas grandes */
+@media (min-width: 1024px) {
+  .top-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
 /* RESPONSIVE DESIGN */
 @media (max-width: 768px) {
   .app-header {
