@@ -4,8 +4,6 @@
 
 // Variable global para controlar la instalación de la PWA
 let deferredPrompt = null;
-let radarMap = null;
-let radarLayer = null;
 let audioCtx = null;
 let rainSound = null;
 let windSound = null;
@@ -388,9 +386,6 @@ function renderWeather(data, cityName) {
   
   // 10. Actualizar astronomía (Sol y Luna)
   updateAstronomy(data);
-  
-  // 11. Actualizar mapa de radar interactivo
-  updateRadarMap(data.latitude, data.longitude);
   
   // Re-procesar iconos de Lucide
   safeCreateIcons();
@@ -1086,69 +1081,6 @@ function calculateMoonPhase(date) {
   return { phaseName, illumination };
 }
 
-// 11. Actualizar mapa de radar interactivo
-async function updateRadarMap(lat, lon) {
-  // Validar si Leaflet está cargado
-  if (typeof L === 'undefined') {
-    console.warn('La librería Leaflet no está cargada. Omitiendo radar.');
-    return;
-  }
-  
-  try {
-    const mapDiv = document.getElementById('radar-map');
-    if (!mapDiv) return;
-    
-    // Si no está inicializado, crearlo
-    if (!radarMap) {
-      radarMap = L.map('radar-map', {
-        zoomControl: true,
-        attributionControl: true,
-        scrollWheelZoom: false,
-        maxZoom: 12 // Limitar zoom máximo general a 12 para evitar imágenes de error
-      }).setView([lat, lon], 8);
-      
-      // Capa base oscura (CartoDB Dark Matter)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 12
-      }).addTo(radarMap);
-    } else {
-      radarMap.setView([lat, lon], 8);
-    }
-    
-    // Forzar redibujado de tamaño
-    setTimeout(() => {
-      if (radarMap) radarMap.invalidateSize();
-    }, 200);
-    
-    // Consultar el último timestamp de radar de RainViewer
-    const rvResponse = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-    if (!rvResponse.ok) throw new Error('Error al obtener datos de RainViewer');
-    
-    const rvData = await rvResponse.json();
-    if (rvData && rvData.radar && rvData.radar.past && rvData.radar.past.length > 0) {
-      const latestRadar = rvData.radar.past[rvData.radar.past.length - 1];
-      const timestamp = latestRadar.time;
-      
-      // Eliminar capa de radar anterior si existe
-      if (radarLayer) {
-        radarMap.removeLayer(radarLayer);
-      }
-      
-      // Añadir la nueva capa del radar de RainViewer con zoom nativo máximo de 8
-      const radarUrl = `https://tilecache.rainviewer.com/v2/radar/${timestamp}/256/{z}/{x}/{y}/2/1_1.png`;
-      radarLayer = L.tileLayer(radarUrl, {
-        opacity: 0.6,
-        maxZoom: 12,
-        maxNativeZoom: 8, // Escala los mosaicos de zoom 8 si se hace más zoom
-        attribution: '&copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
-      }).addTo(radarMap);
-    }
-  } catch (error) {
-    console.error('Error al actualizar el radar de clima:', error);
-  }
-}
 
 // 12. Renderizar tarjetas de pronóstico por horas (swipeable)
 function renderHourlyScroll(hourly) {
