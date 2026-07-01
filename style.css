@@ -746,8 +746,8 @@ body.weather-rainy .rain-particles {
   font-size: 1.1rem;
 }
 
-/* TARJETA DE GRÁFICO */
-.chart-card .card-header {
+/* CABECERA GENERAL DE TARJETAS */
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1265,6 +1265,11 @@ body.weather-rainy .rain-particles {
 
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .forecast-row {
+    grid-template-columns: 2.8fr 3fr 2.2fr; /* Más espacio para los nombres de días en pantallas angostas */
+    padding: 0.75rem 0.5rem; /* Menor padding lateral para aprovechar el ancho */
   }
 }
 
