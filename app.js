@@ -10,7 +10,7 @@ let audioCtx = null;
 let rainSound = null;
 let windSound = null;
 let thunderInterval = null;
-let isSoundMuted = true;
+let isSoundMuted = localStorage.getItem('aura_sound_muted') !== 'false';
 let currentActiveWeatherCode = null;
 let currentWindSpeed = 0;
 
@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initApp() {
   loadFavorites();
   setupEventListeners();
+  initSoundButtonState();
   
   // Cargar ciudad inicial (por defecto Madrid o última buscada)
   const savedLastCity = localStorage.getItem('aura_last_city');
@@ -1097,14 +1098,15 @@ async function updateRadarMap(lat, lon) {
       radarMap = L.map('radar-map', {
         zoomControl: true,
         attributionControl: true,
-        scrollWheelZoom: false
+        scrollWheelZoom: false,
+        maxZoom: 18 // Limitar zoom del mapa para evitar grids vacías
       }).setView([lat, lon], 8);
       
       // Capa base oscura (CartoDB Dark Matter)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
-        maxZoom: 20
+        maxZoom: 18
       }).addTo(radarMap);
     } else {
       radarMap.setView([lat, lon], 8);
@@ -1129,10 +1131,12 @@ async function updateRadarMap(lat, lon) {
         radarMap.removeLayer(radarLayer);
       }
       
-      // Añadir la nueva capa del radar de RainViewer
+      // Añadir la nueva capa del radar de RainViewer con zoom nativo máximo de 16
       const radarUrl = `https://tilecache.rainviewer.com/v2/radar/${timestamp}/256/{z}/{x}/{y}/2/1_1.png`;
       radarLayer = L.tileLayer(radarUrl, {
         opacity: 0.6,
+        maxZoom: 18,
+        maxNativeZoom: 16, // Escala los mosaicos de zoom 16 si se hace más zoom
         attribution: '&copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
       }).addTo(radarMap);
     }
@@ -1198,6 +1202,7 @@ function toggleAmbientSound() {
   initAudioContext();
   
   isSoundMuted = !isSoundMuted;
+  localStorage.setItem('aura_sound_muted', isSoundMuted ? 'true' : 'false');
   
   const btn = elements.soundBtn;
   if (btn) {
@@ -1450,4 +1455,33 @@ function playThunder() {
     osc2.start();
     osc2.stop(audioCtx.currentTime + 2.6);
   }, 1200);
+}
+
+// 14. Inicializar estado del botón de sonido y persistencia de audio por gestos
+function initSoundButtonState() {
+  const btn = elements.soundBtn;
+  if (!btn) return;
+  
+  if (isSoundMuted) {
+    btn.classList.remove('active');
+    btn.title = 'Activar sonido ambiental';
+    btn.innerHTML = '<i data-lucide="volume-x" class="sound-icon"></i>';
+  } else {
+    btn.classList.add('active');
+    btn.title = 'Desactivar sonido ambiental';
+    btn.innerHTML = '<i data-lucide="volume-2" class="sound-icon"></i>';
+    
+    // Registrar listener para habilitar AudioContext tras el primer gesto
+    const playAudioOnGesture = () => {
+      initAudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      applyAudioState();
+      document.removeEventListener('click', playAudioOnGesture);
+      document.removeEventListener('touchstart', playAudioOnGesture);
+    };
+    document.addEventListener('click', playAudioOnGesture);
+    document.addEventListener('touchstart', playAudioOnGesture);
+  }
 }
