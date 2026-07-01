@@ -371,7 +371,7 @@ function renderWeather(data, cityName) {
   elements.rainChance.textContent = `${rainProb}%`;
   elements.uvIndex.textContent = getUVDescription(maxUV);
   
-  generateAuraInsight(current.temperature_2m, current.weather_code, rainProb, maxUV, current.wind_speed_10m);
+  generateAuraInsight(current.temperature_2m, current.weather_code, rainProb, maxUV, current.wind_speed_10m, current.is_day);
   
   // 8. Gráfico de 24 Horas
   renderHourlyScroll(hourly);
@@ -405,15 +405,15 @@ function getUVDescription(uv) {
   return `Extremo (${Math.round(uv)})`;
 }
 
-// Generación de IA/Insights basados en reglas de clima
-function generateAuraInsight(temp, code, rainProb, uv, wind) {
+// Generación de IA/Insights basados en reglas de clima y hora del día
+function generateAuraInsight(temp, code, rainProb, uv, wind, isDay) {
   let message = "";
   
   if (rainProb >= 60) {
     message = "🌧️ Alta probabilidad de lluvia hoy. Te aconsejamos llevar un paraguas contigo y usar calzado impermeable.";
-  } else if (temp >= 32) {
+  } else if (temp >= 32 && isDay === 1) {
     message = "☀️ Hace mucho calor afuera. Mantente hidratado, evita el sol al mediodía y recuerda usar protector solar de amplio espectro.";
-  } else if (uv >= 7) {
+  } else if (uv >= 7 && isDay === 1) {
     message = "🕶️ El índice de radiación UV está muy elevado. Es ideal llevar gafas de sol, sombrero y bloqueador solar si vas a estar al aire libre.";
   } else if (wind >= 30) {
     message = "💨 Hay alertas de vientos fuertes hoy. Ten precaución con objetos sueltos en terrazas y mantente alerta al caminar cerca de árboles.";
@@ -424,7 +424,12 @@ function generateAuraInsight(temp, code, rainProb, uv, wind) {
   } else if (rainProb >= 20 && rainProb < 60) {
     message = "⛅ Clima inestable. Podrían ocurrir lloviznas intermitentes. Un cortavientos impermeable ligero será tu mejor aliado.";
   } else {
-    message = "✨ ¡Día espectacular! Las condiciones climáticas son excelentes para realizar actividades al aire libre o dar un paseo.";
+    // Mensaje nocturno vs diurno agradable
+    if (isDay === 0) {
+      message = "🌙 ✨ La noche se presenta tranquila y despejada. Excelente momento para descansar o disfrutar de una caminata nocturna fresca.";
+    } else {
+      message = "✨ ¡Día espectacular! Las condiciones climáticas son excelentes para realizar actividades al aire libre o dar un paseo.";
+    }
   }
   
   elements.insightText.textContent = message;
