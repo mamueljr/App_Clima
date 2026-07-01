@@ -1099,14 +1099,14 @@ async function updateRadarMap(lat, lon) {
         zoomControl: true,
         attributionControl: true,
         scrollWheelZoom: false,
-        maxZoom: 18 // Limitar zoom del mapa para evitar grids vacías
+        maxZoom: 12 // Limitar zoom máximo general a 12 para evitar imágenes de error
       }).setView([lat, lon], 8);
       
       // Capa base oscura (CartoDB Dark Matter)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
-        maxZoom: 18
+        maxZoom: 12
       }).addTo(radarMap);
     } else {
       radarMap.setView([lat, lon], 8);
@@ -1131,12 +1131,12 @@ async function updateRadarMap(lat, lon) {
         radarMap.removeLayer(radarLayer);
       }
       
-      // Añadir la nueva capa del radar de RainViewer con zoom nativo máximo de 16
+      // Añadir la nueva capa del radar de RainViewer con zoom nativo máximo de 8
       const radarUrl = `https://tilecache.rainviewer.com/v2/radar/${timestamp}/256/{z}/{x}/{y}/2/1_1.png`;
       radarLayer = L.tileLayer(radarUrl, {
         opacity: 0.6,
-        maxZoom: 18,
-        maxNativeZoom: 10, // RainViewer max zoom is 10; upscaling avoids 'zoom level not supported' tiles
+        maxZoom: 12,
+        maxNativeZoom: 8, // Escala los mosaicos de zoom 8 si se hace más zoom
         attribution: '&copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
       }).addTo(radarMap);
     }
