@@ -119,6 +119,9 @@
           <div class="card-header-actions">
             <span class="location-name" id="weather-location">Madrid, España</span>
             <div class="action-buttons-group">
+              <button id="sound-btn" class="sound-action-btn" title="Activar sonido ambiental">
+                <i data-lucide="volume-x" class="sound-icon"></i>
+              </button>
               <button id="share-btn" class="share-action-btn" title="Compartir clima">
                 <i data-lucide="share-2" class="share-icon"></i>
               </button>
@@ -275,11 +278,32 @@
         </div>
       </section>
 
+      <!-- PRONÓSTICO POR HORAS DESLIZABLE -->
+      <section class="card hourly-scroll-card">
+        <div class="card-header">
+          <div class="hourly-header-title">
+            <i data-lucide="clock" class="hourly-icon text-teal-400"></i>
+            <h3>Pronóstico por Horas (Siguiente)</h3>
+          </div>
+          <span class="badge">Desliza para ver más</span>
+        </div>
+        <div id="hourly-scroll-container" class="hourly-scroll-container">
+          <!-- Tarjetas generadas dinámicamente en JS -->
+        </div>
+      </section>
+
       <!-- GRÁFICO DE PRONÓSTICO POR HORAS -->
       <section class="card chart-card">
         <div class="card-header">
-          <h3>Pronóstico de las Próximas 24 Horas</h3>
-          <span class="badge">Temperatura & Humedad</span>
+          <div class="chart-header-title">
+            <h3>Gráfico del Clima</h3>
+            <span class="badge">Tendencia</span>
+          </div>
+          <div class="chart-filter-buttons">
+            <button class="chart-filter-btn" data-hours="6">6H</button>
+            <button class="chart-filter-btn" data-hours="12">12H</button>
+            <button class="chart-filter-btn active" data-hours="24">24H</button>
+          </div>
         </div>
         <div class="chart-wrapper">
           <canvas id="hourlyChart"></canvas>

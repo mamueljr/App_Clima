@@ -6,6 +6,13 @@
 let deferredPrompt = null;
 let radarMap = null;
 let radarLayer = null;
+let audioCtx = null;
+let rainSound = null;
+let windSound = null;
+let thunderInterval = null;
+let isSoundMuted = true;
+let currentActiveWeatherCode = null;
+let currentWindSpeed = 0;
 
 // Estado de la aplicación
 const AppState = {
@@ -17,7 +24,8 @@ const AppState = {
   favorites: [],
   hourlyChart: null,
   unit: 'C',
-  lastWeatherData: null
+  lastWeatherData: null,
+  chartHours: 24
 };
 
 // Mapeo de códigos de clima WMO (World Meteorological Organization)
@@ -88,7 +96,9 @@ const elements = {
   moonPhaseIconContainer: document.getElementById('moon-phase-icon-container'),
   moonPhaseLabel: document.getElementById('moon-phase-label'),
   moonIlluminationVal: document.getElementById('moon-illumination-val'),
-  sunNode: document.getElementById('sun-node')
+  sunNode: document.getElementById('sun-node'),
+  soundBtn: document.getElementById('sound-btn'),
+  hourlyScrollContainer: document.getElementById('hourly-scroll-container')
 };
 
 // Inicialización al cargar la página
@@ -162,6 +172,23 @@ function setupEventListeners() {
   if (elements.shareBtn) {
     elements.shareBtn.addEventListener('click', shareCurrentWeather);
   }
+
+  // Botón de sonido ambiental
+  if (elements.soundBtn) {
+    elements.soundBtn.addEventListener('click', toggleAmbientSound);
+  }
+
+  // Filtros del gráfico por horas
+  document.querySelectorAll('.chart-filter-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.chart-filter-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      AppState.chartHours = parseInt(e.target.dataset.hours);
+      if (AppState.lastWeatherData && AppState.lastWeatherData.hourly) {
+        renderHourlyChart(AppState.lastWeatherData.hourly);
+      }
+    });
+  });
 
   // Click listener por defecto en el PWA badge para guiar al usuario
   const pwaBadge = document.querySelector('.pwa-badge');
@@ -346,6 +373,7 @@ function renderWeather(data, cityName) {
   generateAuraInsight(current.temperature_2m, current.weather_code, rainProb, maxUV, current.wind_speed_10m);
   
   // 8. Gráfico de 24 Horas
+  renderHourlyScroll(hourly);
   renderHourlyChart(hourly);
   
   // 9. Pronóstico de 7 Días
@@ -353,6 +381,9 @@ function renderWeather(data, cityName) {
   
   // Actualizar efectos animados de partículas (lluvia / nieve)
   updateWeatherEffects(codeInfo.class, current.is_day);
+  
+  // Actualizar sonido ambiental según clima actual
+  updateAmbientSound(current.weather_code, current.wind_speed_10m);
   
   // 10. Actualizar astronomía (Sol y Luna)
   updateAstronomy(data);
@@ -406,7 +437,7 @@ function renderHourlyChart(hourly) {
     return;
   }
   
-  // Obtener los datos de las próximas 24 horas a partir del índice actual
+  // Obtener los datos de las próximas horas a partir del índice actual
   const now = new Date();
   const currentHour = now.getHours();
   
@@ -414,7 +445,11 @@ function renderHourlyChart(hourly) {
   const temps = [];
   const rainChances = [];
   
-  for (let i = currentHour; i < currentHour + 24; i++) {
+  const numHours = AppState.chartHours || 24;
+  for (let i = currentHour; i < currentHour + numHours; i++) {
+    // Evitar desbordamiento de índice si i supera la longitud del array
+    if (i >= hourly.time.length) break;
+    
     const date = new Date(hourly.time[i]);
     const displayHour = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     labels.push(displayHour);
@@ -1104,4 +1139,315 @@ async function updateRadarMap(lat, lon) {
   } catch (error) {
     console.error('Error al actualizar el radar de clima:', error);
   }
+}
+
+// 12. Renderizar tarjetas de pronóstico por horas (swipeable)
+function renderHourlyScroll(hourly) {
+  const container = elements.hourlyScrollContainer;
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  const now = new Date();
+  const currentHour = now.getHours();
+  
+  // Renderizar las siguientes 12 horas
+  for (let i = currentHour; i < currentHour + 12; i++) {
+    if (i >= hourly.time.length) break;
+    
+    const date = new Date(hourly.time[i]);
+    const displayHour = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    
+    let tempVal = hourly.temperature_2m[i];
+    if (AppState.unit === 'F') {
+      tempVal = (tempVal * 9) / 5 + 32;
+    }
+    const tempText = `${Math.round(tempVal)}°`;
+    
+    const weatherCode = hourly.weather_code[i];
+    const codeInfo = WeatherCodes[weatherCode] || { label: 'Desconocido', icon: 'help-circle' };
+    const rainProb = hourly.precipitation_probability[i];
+    
+    const card = document.createElement('div');
+    card.className = 'hourly-item-card';
+    
+    let rainBadgeHtml = '';
+    if (rainProb > 0) {
+      rainBadgeHtml = `<span class="hourly-item-rain"><i data-lucide="droplets" style="width: 10px; height: 10px;"></i> ${rainProb}%</span>`;
+    }
+    
+    card.innerHTML = `
+      <span class="hourly-item-time">${i === currentHour ? 'Ahora' : displayHour}</span>
+      <i data-lucide="${codeInfo.icon}" class="hourly-item-icon"></i>
+      <span class="hourly-item-temp">${tempText}</span>
+      ${rainBadgeHtml}
+    `;
+    
+    container.appendChild(card);
+  }
+}
+
+// 13. Sintetizador de Audio Ambiental con Web Audio API (100% Offline)
+function initAudioContext() {
+  if (audioCtx) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AudioContext();
+}
+
+function toggleAmbientSound() {
+  initAudioContext();
+  
+  isSoundMuted = !isSoundMuted;
+  
+  const btn = elements.soundBtn;
+  if (btn) {
+    if (isSoundMuted) {
+      btn.classList.remove('active');
+      btn.title = 'Activar sonido ambiental';
+      btn.innerHTML = '<i data-lucide="volume-x" class="sound-icon"></i>';
+    } else {
+      btn.classList.add('active');
+      btn.title = 'Desactivar sonido ambiental';
+      btn.innerHTML = '<i data-lucide="volume-2" class="sound-icon"></i>';
+    }
+    safeCreateIcons();
+  }
+  
+  // Reanudar contexto si estaba en pausa (política del navegador)
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  
+  applyAudioState();
+  
+  if (!isSoundMuted) {
+    showToast('Sonido ambiental activado (Sintetizado)', 'volume-2');
+  } else {
+    showToast('Sonido ambiental silenciado', 'volume-x');
+  }
+}
+
+function updateAmbientSound(weatherCode, windSpeed) {
+  currentActiveWeatherCode = weatherCode;
+  currentWindSpeed = windSpeed;
+  
+  if (audioCtx && !isSoundMuted) {
+    applyAudioState();
+  }
+}
+
+function applyAudioState() {
+  if (!audioCtx) return;
+  
+  // Si está silenciado, apagar todos los sonidos suavemente y pausar
+  if (isSoundMuted) {
+    stopRainSound();
+    stopWindSound();
+    if (thunderInterval) {
+      clearInterval(thunderInterval);
+      thunderInterval = null;
+    }
+    return;
+  }
+  
+  const code = currentActiveWeatherCode;
+  const wind = currentWindSpeed;
+  
+  const isRainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+  const isStormy = code >= 95 && code <= 99;
+  const isWindy = wind >= 25 || code === 3 || code === 45 || code === 48 || code === 85 || code === 86;
+  
+  // Manejar Sonido de Lluvia
+  if (isRainy || isStormy) {
+    startRainSound(isStormy ? 0.2 : 0.12);
+  } else {
+    stopRainSound();
+  }
+  
+  // Manejar Tormenta (Truenos periódicos)
+  if (isStormy) {
+    if (!thunderInterval) {
+      // Tocar un trueno inicial y luego cada 15-25 segundos
+      setTimeout(playThunder, 2000);
+      thunderInterval = setInterval(playThunder, 20000);
+    }
+  } else {
+    if (thunderInterval) {
+      clearInterval(thunderInterval);
+      thunderInterval = null;
+    }
+  }
+  
+  // Manejar Sonido de Viento
+  if (isWindy && !isRainy && !isStormy) {
+    startWindSound(Math.min(0.15, wind / 250));
+  } else {
+    stopWindSound();
+  }
+}
+
+// Generador de ruido blanco filtrado para la lluvia
+function startRainSound(targetVolume) {
+  if (rainSound) {
+    // Si ya existe, solo ajustamos el volumen suavemente
+    rainSound.gainNode.gain.linearRampToValueAtTime(targetVolume, audioCtx.currentTime + 1);
+    return;
+  }
+  
+  const bufferSize = audioCtx.sampleRate * 2;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    output[i] = Math.random() * 2 - 1;
+  }
+  
+  const source = audioCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+  source.loop = true;
+  
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 1200; // frecuencia de lluvia
+  filter.Q.value = 1.0;
+  
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(targetVolume, audioCtx.currentTime + 1.5);
+  
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  source.start();
+  rainSound = { source, gainNode };
+}
+
+function stopRainSound() {
+  if (!rainSound) return;
+  
+  const gn = rainSound.gainNode;
+  const src = rainSound.source;
+  
+  gn.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+  setTimeout(() => {
+    try {
+      src.stop();
+    } catch(e) {}
+  }, 1100);
+  
+  rainSound = null;
+}
+
+// Generador de viento (ruido blanco + LFO oscilante + filtro paso bajo)
+function startWindSound(targetVolume) {
+  if (windSound) {
+    windSound.gainNode.gain.linearRampToValueAtTime(targetVolume, audioCtx.currentTime + 1);
+    return;
+  }
+  
+  const bufferSize = audioCtx.sampleRate * 3;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    output[i] = Math.random() * 2 - 1;
+  }
+  
+  const source = audioCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+  source.loop = true;
+  
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 350;
+  
+  // Modulación lenta de la frecuencia del filtro para simular ráfagas de viento
+  const lfo = audioCtx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.08; // ráfagas cada 12 segundos
+  
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 180;
+  
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(targetVolume, audioCtx.currentTime + 1.5);
+  
+  lfo.connect(lfoGain);
+  lfoGain.connect(filter.frequency);
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  lfo.start();
+  source.start();
+  
+  windSound = { source, lfo, gainNode };
+}
+
+function stopWindSound() {
+  if (!windSound) return;
+  
+  const gn = windSound.gainNode;
+  const src = windSound.source;
+  const lfo = windSound.lfo;
+  
+  gn.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+  setTimeout(() => {
+    try {
+      src.stop();
+      lfo.stop();
+    } catch(e) {}
+  }, 1100);
+  
+  windSound = null;
+}
+
+// Trueno sintetizado de baja frecuencia
+function playThunder() {
+  if (!audioCtx || isSoundMuted) return;
+  
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.value = 45; // frecuencia ultra baja para el retumbar
+  
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 85;
+  
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  // Ataque rápido y desvanecimiento lento (retumbar)
+  gainNode.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 0.15);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 4.5);
+  
+  osc.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  osc.start();
+  osc.stop(audioCtx.currentTime + 4.6);
+  
+  // Pequeño retumbar secundario un segundo después
+  setTimeout(() => {
+    if (isSoundMuted) return;
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.value = 35;
+    
+    const filter2 = audioCtx.createBiquadFilter();
+    filter2.type = 'lowpass';
+    filter2.frequency.value = 60;
+    
+    const gainNode2 = audioCtx.createGain();
+    gainNode2.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode2.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.1);
+    gainNode2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.5);
+    
+    osc2.connect(filter2);
+    filter2.connect(gainNode2);
+    gainNode2.connect(audioCtx.destination);
+    
+    osc2.start();
+    osc2.stop(audioCtx.currentTime + 2.6);
+  }, 1200);
 }
