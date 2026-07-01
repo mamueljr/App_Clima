@@ -10,7 +10,7 @@ let audioCtx = null;
 let rainSound = null;
 let windSound = null;
 let thunderInterval = null;
-let isSoundMuted = localStorage.getItem('aura_sound_muted') !== 'false';
+let isSoundMuted = localStorage.getItem('aura_sound_muted') === 'true';
 let currentActiveWeatherCode = null;
 let currentWindSpeed = 0;
 
@@ -25,7 +25,7 @@ const AppState = {
   hourlyChart: null,
   unit: 'C',
   lastWeatherData: null,
-  chartHours: 24
+  chartHours: 6
 };
 
 // Mapeo de códigos de clima WMO (World Meteorological Organization)
@@ -1136,7 +1136,7 @@ async function updateRadarMap(lat, lon) {
       radarLayer = L.tileLayer(radarUrl, {
         opacity: 0.6,
         maxZoom: 18,
-        maxNativeZoom: 16, // Escala los mosaicos de zoom 16 si se hace más zoom
+        maxNativeZoom: 10, // RainViewer max zoom is 10; upscaling avoids 'zoom level not supported' tiles
         attribution: '&copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
       }).addTo(radarMap);
     }
