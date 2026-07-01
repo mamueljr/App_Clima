@@ -992,27 +992,52 @@ function updateAstronomy(data) {
   const sunNode = elements.sunNode;
   
   if (sunNode) {
-    if (now >= sunriseTime && now <= sunsetTime) {
+    const isDaytime = now >= sunriseTime && now <= sunsetTime;
+    let progress = 0;
+    
+    if (isDaytime) {
       // El sol está arriba
       const totalDaylight = sunsetTime.getTime() - sunriseTime.getTime();
       const currentDaylight = now.getTime() - sunriseTime.getTime();
-      const progress = currentDaylight / totalDaylight; // Fracción entre 0 y 1
+      progress = currentDaylight / totalDaylight;
       
-      // Ángulo de semicírculo en grados (180 a 0)
-      const angleDeg = 180 - (progress * 180);
-      const angleRad = (angleDeg * Math.PI) / 180;
-      
-      // Radio del arco es 40, centro en (50, 45) en base al viewBox del SVG
-      const cx = 50 + 40 * Math.cos(angleRad);
-      const cy = 45 - 40 * Math.sin(angleRad);
-      
-      sunNode.setAttribute('cx', cx.toFixed(1));
-      sunNode.setAttribute('cy', cy.toFixed(1));
-      sunNode.style.display = 'block';
+      // Color dorado para el Sol
+      sunNode.setAttribute('fill', '#fbbf24');
     } else {
-      // Es de noche, ocultamos el sol del arco diurno
-      sunNode.style.display = 'none';
+      // Es de noche: calcular el progreso de la noche
+      let nightStart, nightEnd;
+      if (now > sunsetTime) {
+        // La noche empezó hoy al atardecer y termina mañana al amanecer
+        nightStart = sunsetTime;
+        nightEnd = daily.sunrise[1] ? new Date(daily.sunrise[1]) : new Date(sunsetTime.getTime() + 12 * 60 * 60 * 1000);
+      } else {
+        // La noche empezó ayer al atardecer y termina hoy al amanecer
+        nightStart = daily.sunset[0] ? new Date(new Date(daily.sunset[0]).getTime() - 24 * 60 * 60 * 1000) : new Date(sunriseTime.getTime() - 12 * 60 * 60 * 1000);
+        nightEnd = sunriseTime;
+      }
+      
+      const totalNight = nightEnd.getTime() - nightStart.getTime();
+      const currentNight = now.getTime() - nightStart.getTime();
+      progress = currentNight / totalNight;
+      
+      // Color plateado/blanco para la Luna
+      sunNode.setAttribute('fill', '#e2e8f0');
     }
+    
+    // Forzar límites de progreso
+    progress = Math.max(0, Math.min(1, progress));
+    
+    // Ángulo de semicírculo en grados (180 a 0)
+    const angleDeg = 180 - (progress * 180);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    
+    // Radio del arco es 40, centro en (50, 45) en base al viewBox del SVG
+    const cx = 50 + 40 * Math.cos(angleRad);
+    const cy = 45 - 40 * Math.sin(angleRad);
+    
+    sunNode.setAttribute('cx', cx.toFixed(1));
+    sunNode.setAttribute('cy', cy.toFixed(1));
+    sunNode.style.display = 'block';
   }
   
   // Calcular fase lunar
