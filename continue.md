@@ -64,3 +64,7 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
   * Se integró la API pública de **MET Norway (yr.no)** como proveedor de clima secundario de respaldo.
   * Si la petición a la API principal (Open-Meteo) falla o supera el tiempo de espera de 8 segundos, la aplicación captura el fallo e inicia de forma inmediata una llamada a la API de MET Norway.
   * Se desarrolló un transformador de datos (`mapMetNorwayToOpenMeteo`) que adapta la estructura JSON de MET Norway al formato estándar de Open-Meteo. Esto hace que el cambio de API sea 100% transparente para el usuario final, manteniendo intactos todos los componentes visuales (gráficos de tendencias, tarjetas deslizables, astronomía diurna/nocturna y sintetizador de audio).
+* **Actualización Forzada e Inmediata de PWA**:
+  * Se implementó un detector de actualizaciones avanzadas en el registro del Service Worker en `index.html`.
+  * Ahora, cuando se publica una nueva versión de la app en GitHub Pages, la aplicación envía un comando `SKIP_WAITING` y escucha el evento `controllerchange`.
+  * Esto fuerza una **recarga de página automática e instantánea** para el usuario tan pronto como la nueva versión se instala, eliminando por completo el problema del "caché pegajoso" sin requerir que el usuario borre los datos de forma manual o cierre la aplicación.

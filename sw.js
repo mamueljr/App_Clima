@@ -2,7 +2,7 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v13';
+const CACHE_NAME = 'aura-weather-cache-v14';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -88,4 +88,11 @@ self.addEventListener('fetch', (event) => {
         }
       })
   );
+});
+
+// Permitir activar el Service Worker inmediatamente cuando el frontend lo solicite
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
