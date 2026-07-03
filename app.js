@@ -199,7 +199,7 @@ function setupEventListeners() {
 // Búsqueda de ciudades (Autocompletado)
 async function searchCity(query) {
   try {
-    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=es&format=json`);
+    const response = await fetchWithTimeout(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=es&format=json`, { timeout: 5000 });
     const data = await response.json();
     
     if (data.results && data.results.length > 0) {
@@ -263,7 +263,7 @@ function getUserLocation() {
       // Intentar obtener el nombre de la ciudad mediante geocodificación inversa
       let cityName = 'Ubicación Actual';
       try {
-        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=es`);
+        const response = await fetchWithTimeout(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=es`, { timeout: 4000 });
         const geoData = await response.json();
         if (geoData.city || geoData.locality) {
           cityName = `${geoData.city || geoData.locality}, ${geoData.countryName}`;
@@ -284,6 +284,26 @@ function getUserLocation() {
   );
 }
 
+// Helper para realizar peticiones fetch con límite de tiempo (timeout)
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 8000 } = options;
+  
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
 // Obtener datos del clima
 async function fetchWeatherData(lat, lon, cityName) {
   // Mostrar pantalla de carga
@@ -291,7 +311,7 @@ async function fetchWeatherData(lat, lon, cityName) {
   elements.mainContent.classList.add('hidden');
   
   try {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`);
+    const response = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`, { timeout: 8000 });
     
     if (!response.ok) throw new Error('Error al consultar la API del clima');
     
@@ -304,10 +324,14 @@ async function fetchWeatherData(lat, lon, cityName) {
     elements.mainContent.classList.remove('hidden');
   } catch (error) {
     console.error('Error obteniendo clima:', error);
+    let errMsg = error.message || error;
+    if (error.name === 'AbortError') {
+      errMsg = 'El servidor de clima tardó demasiado en responder (Tiempo de espera agotado)';
+    }
     elements.statusMessage.innerHTML = `
       <i data-lucide="wifi-off" style="width: 48px; height: 48px; color: #ef4444;"></i>
-      <p style="color: #cbd5e1;">Error: ${error.message || error}</p>
-      <button onclick="location.reload()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600;">Reintentar</button>
+      <p style="color: #cbd5e1; padding: 0 1rem; text-align: center;">Error: ${errMsg}</p>
+      <button onclick="location.reload()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
     `;
     safeCreateIcons();
   }
@@ -733,7 +757,7 @@ function detectUserLocationAutomatically() {
       
       let cityName = 'Tu Ubicación';
       try {
-        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=es`);
+        const response = await fetchWithTimeout(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=es`, { timeout: 4000 });
         const geoData = await response.json();
         if (geoData.city || geoData.locality) {
           cityName = `${geoData.city || geoData.locality}, ${geoData.countryName}`;

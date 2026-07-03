@@ -53,3 +53,10 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
 * **Mejoras de Espaciado y Usabilidad**:
   * Corrección de margen inferior en cabeceras de tarjeta (`.card-header` a `1.25rem`) para separar los subtítulos del contenido inferior.
   * Ajuste de columnas en el pronóstico de 7 días para móviles (`grid-template-columns: 2.8fr 3fr 2.2fr` en menores a 480px), asignando más espacio al nombre del día para evitar que se encime con el icono meteorológico.
+
+### 2 de Julio de 2026
+* **Control de Tiempos de Espera (Fetch Timeout)**:
+  * Se creó una función utilitaria `fetchWithTimeout` que permite abortar peticiones fetch si sobrepasan un tiempo límite, previniendo congelamientos de la interfaz ante caídas de red o fallas en servidores externos.
+  * **API del Clima**: Configurado con un tiempo límite de **8 segundos** para peticiones a Open-Meteo. Si se agota el tiempo, la app aborta la petición, oculta el cargador infinito ("skeleton loader") y despliega una interfaz con un botón destacado de **Reintentar** y un icono de desconexión.
+  * **API de Geolocalización Inversa**: Configurado con un límite de **4 segundos** en `bigdatacloud.net` para la geolocalización por GPS e inicio automático, garantizando que el flujo inicial de la app no quede bloqueado si la resolución del nombre de ciudad se ralentiza.
+  * **API de Autocompletado de Ciudades**: Límite de **5 segundos** para evitar bloqueos en el campo de búsqueda de texto.
