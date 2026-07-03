@@ -304,16 +304,17 @@ async function fetchWithTimeout(resource, options = {}) {
   }
 }
 
-// Obtener datos del clima
+// Obtener datos del clima (con soporte de respaldo automático)
 async function fetchWeatherData(lat, lon, cityName) {
   // Mostrar pantalla de carga
   elements.statusMessage.classList.remove('hidden');
   elements.mainContent.classList.add('hidden');
   
   try {
+    // Intentar API Primaria (Open-Meteo)
     const response = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`, { timeout: 8000 });
     
-    if (!response.ok) throw new Error('Error al consultar la API del clima');
+    if (!response.ok) throw new Error('API principal de Open-Meteo no disponible');
     
     const data = await response.json();
     AppState.lastWeatherData = data;
@@ -322,19 +323,217 @@ async function fetchWeatherData(lat, lon, cityName) {
     // Ocultar pantalla de carga
     elements.statusMessage.classList.add('hidden');
     elements.mainContent.classList.remove('hidden');
-  } catch (error) {
-    console.error('Error obteniendo clima:', error);
-    let errMsg = error.message || error;
-    if (error.name === 'AbortError') {
-      errMsg = 'El servidor de clima tardó demasiado en responder (Tiempo de espera agotado)';
+  } catch (primaryError) {
+    console.warn('API Principal (Open-Meteo) falló, intentando API de respaldo (MET Norway)...', primaryError);
+    
+    try {
+      // Intentar API de Respaldo (MET Norway)
+      const backupResponse = await fetchWithTimeout(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`, { timeout: 8000 });
+      
+      if (!backupResponse.ok) throw new Error('API de respaldo de MET Norway no disponible');
+      
+      const backupJson = await backupResponse.json();
+      const mappedData = mapMetNorwayToOpenMeteo(backupJson, lat, lon);
+      
+      AppState.lastWeatherData = mappedData;
+      renderWeather(mappedData, cityName);
+      
+      showToast('Cargados datos de respaldo (MET Norway)', 'info');
+      
+      // Ocultar pantalla de carga
+      elements.statusMessage.classList.add('hidden');
+      elements.mainContent.classList.remove('hidden');
+    } catch (backupError) {
+      console.error('Ambas APIs de clima fallaron:', backupError);
+      
+      let errMsg = 'Ambas APIs de clima fallaron (Servicios no disponibles)';
+      if (backupError.name === 'AbortError') {
+        errMsg = 'Las solicitudes de clima tardaron demasiado en responder (Tiempo de espera agotado)';
+      }
+      
+      elements.statusMessage.innerHTML = `
+        <i data-lucide="wifi-off" style="width: 48px; height: 48px; color: #ef4444;"></i>
+        <p style="color: #cbd5e1; padding: 0 1rem; text-align: center;">Error: ${errMsg}</p>
+        <button onclick="location.reload()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
+      `;
+      safeCreateIcons();
     }
-    elements.statusMessage.innerHTML = `
-      <i data-lucide="wifi-off" style="width: 48px; height: 48px; color: #ef4444;"></i>
-      <p style="color: #cbd5e1; padding: 0 1rem; text-align: center;">Error: ${errMsg}</p>
-      <button onclick="location.reload()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
-    `;
-    safeCreateIcons();
   }
+}
+
+// Convertidor de códigos de clima de MET Norway (Symbol Code) a códigos WMO standard
+function metNorwaySymbolToWmoCode(symbol) {
+  if (!symbol) return 0;
+  const name = symbol.split('_')[0]; // Limpiar sufijos _day / _night
+  
+  const mapping = {
+    'clearsky': 0,
+    'fair': 1,
+    'partlycloudy': 2,
+    'cloudy': 3,
+    'rainshowers': 80,
+    'heavyrainshowers': 81,
+    'lightrainshowers': 80,
+    'rain': 61,
+    'heavyrain': 63,
+    'lightrain': 61,
+    'snowshowers': 85,
+    'heavysnowshowers': 86,
+    'lightsnowshowers': 85,
+    'snow': 71,
+    'heavysnow': 73,
+    'lightsnow': 71,
+    'sleetshowers': 83,
+    'heavysleetshowers': 84,
+    'lightsleetshowers': 83,
+    'sleet': 66,
+    'heavysleet': 67,
+    'lightsleet': 66,
+    'rainshowersandthunder': 95,
+    'heavyrainshowersandthunder': 95,
+    'lightrainshowersandthunder': 95,
+    'rainandthunder': 95,
+    'heavyrainandthunder': 95,
+    'lightrainandthunder': 95,
+    'snowshowersandthunder': 96,
+    'heavysnowshowersandthunder': 96,
+    'lightsnowshowersandthunder': 96,
+    'snowandthunder': 96,
+    'heavysnowandthunder': 96,
+    'lightsnowandthunder': 96,
+    'sleetshowersandthunder': 95,
+    'heavysleetshowersandthunder': 95,
+    'lightsleetshowersandthunder': 95,
+    'sleetandthunder': 95,
+    'heavysleetandthunder': 95,
+    'lightsleetandthunder': 95,
+    'fog': 45
+  };
+  
+  return mapping[name] !== undefined ? mapping[name] : 3;
+}
+
+// Adaptador para convertir la estructura de MET Norway al formato JSON de Open-Meteo
+function mapMetNorwayToOpenMeteo(metData, lat, lon) {
+  const timeseries = metData.properties.timeseries;
+  if (!timeseries || timeseries.length === 0) {
+    throw new Error('Formato de datos de respaldo incorrecto');
+  }
+  
+  const currentItem = timeseries[0];
+  const currentDetails = currentItem.data.instant.details;
+  const currentSymbol = currentItem.data.next_1_hours?.summary?.symbol_code || currentItem.data.next_6_hours?.summary?.symbol_code || '';
+  
+  const weatherCode = metNorwaySymbolToWmoCode(currentSymbol);
+  const isDay = currentSymbol.includes('day') ? 1 : 0;
+  
+  // Mapear datos actuales
+  const current = {
+    temperature_2m: currentDetails.air_temperature,
+    relative_humidity_2m: currentDetails.relative_humidity,
+    apparent_temperature: currentDetails.air_temperature, // Aproximado
+    is_day: isDay,
+    precipitation: currentItem.data.next_1_hours?.details?.precipitation_amount || 0,
+    rain: currentItem.data.next_1_hours?.details?.precipitation_amount || 0,
+    showers: 0,
+    snowfall: 0,
+    weather_code: weatherCode,
+    cloud_cover: currentDetails.cloud_area_fraction || 0,
+    pressure_msl: currentDetails.air_pressure_at_sea_level,
+    wind_speed_10m: Math.round(currentDetails.wind_speed * 3.6) // m/s a km/h
+  };
+  
+  // Mapear datos horaria (primeras 24 horas)
+  const hourly = {
+    time: [],
+    temperature_2m: [],
+    relative_humidity_2m: [],
+    apparent_temperature: [],
+    precipitation_probability: [],
+    weather_code: [],
+    uv_index: []
+  };
+  
+  const hourlyLimit = Math.min(timeseries.length, 24);
+  for (let i = 0; i < hourlyLimit; i++) {
+    const item = timeseries[i];
+    const details = item.data.instant.details;
+    const itemSymbol = item.data.next_1_hours?.summary?.symbol_code || '';
+    const rainAmount = item.data.next_1_hours?.details?.precipitation_amount || 0;
+    
+    hourly.time.push(item.time);
+    hourly.temperature_2m.push(details.air_temperature);
+    hourly.relative_humidity_2m.push(details.relative_humidity);
+    hourly.apparent_temperature.push(details.air_temperature);
+    hourly.precipitation_probability.push(rainAmount > 0 ? 60 : 0);
+    hourly.weather_code.push(metNorwaySymbolToWmoCode(itemSymbol));
+    hourly.uv_index.push(0);
+  }
+  
+  // Mapear datos diarios (7 días)
+  const daily = {
+    time: [],
+    weather_code: [],
+    temperature_2m_max: [],
+    temperature_2m_min: [],
+    apparent_temperature_max: [],
+    apparent_temperature_min: [],
+    sunrise: [],
+    sunset: [],
+    uv_index_max: [],
+    precipitation_probability_max: []
+  };
+  
+  // Agrupar por días locales
+  const dayGroups = {};
+  timeseries.forEach(item => {
+    const localDateStr = item.time.split('T')[0];
+    if (!dayGroups[localDateStr]) {
+      dayGroups[localDateStr] = [];
+    }
+    dayGroups[localDateStr].push(item);
+  });
+  
+  const daysKeys = Object.keys(dayGroups).sort().slice(0, 7);
+  daysKeys.forEach(dayKey => {
+    const dayItems = dayGroups[dayKey];
+    const temps = dayItems.map(item => item.data.instant.details.air_temperature);
+    const maxTemp = Math.max(...temps);
+    const minTemp = Math.min(...temps);
+    
+    let daySymbol = '';
+    const noonItem = dayItems.find(item => item.time.includes('T12:00:00'));
+    if (noonItem) {
+      daySymbol = noonItem.data.next_6_hours?.summary?.symbol_code || noonItem.data.next_12_hours?.summary?.symbol_code || '';
+    }
+    if (!daySymbol && dayItems.length > 0) {
+      daySymbol = dayItems[0].data.next_6_hours?.summary?.symbol_code || '';
+    }
+    
+    const rainSum = dayItems.reduce((acc, item) => acc + (item.data.next_1_hours?.details?.precipitation_amount || 0), 0);
+    
+    daily.time.push(dayKey);
+    daily.weather_code.push(metNorwaySymbolToWmoCode(daySymbol));
+    daily.temperature_2m_max.push(maxTemp);
+    daily.temperature_2m_min.push(minTemp);
+    daily.apparent_temperature_max.push(maxTemp);
+    daily.apparent_temperature_min.push(minTemp);
+    
+    // Simular horas aproximadas de amanecer y atardecer
+    daily.sunrise.push(`${dayKey}T06:30`);
+    daily.sunset.push(`${dayKey}T20:30`);
+    
+    daily.uv_index_max.push(5);
+    daily.precipitation_probability_max.push(rainSum > 0 ? 80 : 0);
+  });
+  
+  return {
+    latitude: lat,
+    longitude: lon,
+    current,
+    hourly,
+    daily
+  };
 }
 
 // Renderizar toda la info del clima en pantalla

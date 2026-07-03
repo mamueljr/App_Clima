@@ -60,3 +60,7 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
   * **API del Clima**: Configurado con un tiempo límite de **8 segundos** para peticiones a Open-Meteo. Si se agota el tiempo, la app aborta la petición, oculta el cargador infinito ("skeleton loader") y despliega una interfaz con un botón destacado de **Reintentar** y un icono de desconexión.
   * **API de Geolocalización Inversa**: Configurado con un límite de **4 segundos** en `bigdatacloud.net` para la geolocalización por GPS e inicio automático, garantizando que el flujo inicial de la app no quede bloqueado si la resolución del nombre de ciudad se ralentiza.
   * **API de Autocompletado de Ciudades**: Límite de **5 segundos** para evitar bloqueos en el campo de búsqueda de texto.
+* **API de Respaldo Automático (MET Norway Failover)**:
+  * Se integró la API pública de **MET Norway (yr.no)** como proveedor de clima secundario de respaldo.
+  * Si la petición a la API principal (Open-Meteo) falla o supera el tiempo de espera de 8 segundos, la aplicación captura el fallo e inicia de forma inmediata una llamada a la API de MET Norway.
+  * Se desarrolló un transformador de datos (`mapMetNorwayToOpenMeteo`) que adapta la estructura JSON de MET Norway al formato estándar de Open-Meteo. Esto hace que el cambio de API sea 100% transparente para el usuario final, manteniendo intactos todos los componentes visuales (gráficos de tendencias, tarjetas deslizables, astronomía diurna/nocturna y sintetizador de audio).

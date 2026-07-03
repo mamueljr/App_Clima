@@ -2,7 +2,7 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v12';
+const CACHE_NAME = 'aura-weather-cache-v13';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
   // No cachear llamadas a las APIs del clima para garantizar datos frescos
-  if (requestUrl.hostname.includes('open-meteo.com') || requestUrl.hostname.includes('bigdatacloud.net')) {
+  if (requestUrl.hostname.includes('open-meteo.com') || requestUrl.hostname.includes('bigdatacloud.net') || requestUrl.hostname.includes('api.met.no')) {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
