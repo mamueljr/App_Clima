@@ -68,3 +68,11 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
   * Se implementó un detector de actualizaciones avanzadas en el registro del Service Worker en `index.html`.
   * Ahora, cuando se publica una nueva versión de la app en GitHub Pages, la aplicación envía un comando `SKIP_WAITING` y escucha el evento `controllerchange`.
   * Esto fuerza una **recarga de página automática e instantánea** para el usuario tan pronto como la nueva versión se instala, eliminando por completo el problema del "caché pegajoso" sin requerir que el usuario borre los datos de forma manual o cierre la aplicación.
+
+### 3 de Julio de 2026
+* **Migración de API de Respaldo a BrightSky (Solución a bloqueo CORS)**:
+  * **Problema detectado**: La API de MET Norway no soporta CORS directamente en el navegador, lo que bloqueaba las peticiones desde el teléfono del usuario final.
+  * **Solución**: Se reemplazó por la API de **BrightSky (api.brightsky.dev)**, la cual sirve datos del Servicio Meteorológico Alemán (DWD).
+  * **Ventajas**: BrightSky no requiere llave API, soporta CORS de forma nativa desde el navegador web de cualquier teléfono/PC, y cubre pronósticos globales de forma gratuita.
+  * **Adaptador de Datos (`mapBrightSkyToOpenMeteo`)**: Se rediseñó el adaptador de datos para mapear la estructura horaria e íconos de BrightSky al formato nativo de Open-Meteo de manera 100% transparente para la renderización de la app.
+  * **Exclusión de Caché en sw.js**: Se actualizó el Service Worker (caché **`v15`**) para omitir el almacenamiento dinámico de las llamadas a `api.brightsky.dev`.
