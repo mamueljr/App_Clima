@@ -70,9 +70,10 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
   * Esto fuerza una **recarga de página automática e instantánea** para el usuario tan pronto como la nueva versión se instala, eliminando por completo el problema del "caché pegajoso" sin requerir que el usuario borre los datos de forma manual o cierre la aplicación.
 
 ### 3 de Julio de 2026
-* **Migración de API de Respaldo a BrightSky (Solución a bloqueo CORS)**:
-  * **Problema detectado**: La API de MET Norway no soporta CORS directamente en el navegador, lo que bloqueaba las peticiones desde el teléfono del usuario final.
-  * **Solución**: Se reemplazó por la API de **BrightSky (api.brightsky.dev)**, la cual sirve datos del Servicio Meteorológico Alemán (DWD).
-  * **Ventajas**: BrightSky no requiere llave API, soporta CORS de forma nativa desde el navegador web de cualquier teléfono/PC, y cubre pronósticos globales de forma gratuita.
-  * **Adaptador de Datos (`mapBrightSkyToOpenMeteo`)**: Se rediseñó el adaptador de datos para mapear la estructura horaria e íconos de BrightSky al formato nativo de Open-Meteo de manera 100% transparente para la renderización de la app.
-  * **Exclusión de Caché en sw.js**: Se actualizó el Service Worker (caché **`v15`**) para omitir el almacenamiento dinámico de las llamadas a `api.brightsky.dev`.
+* **Inversión de Prioridad de APIs del Clima (Solución definitiva a inestabilidad)**:
+  * **Problema**: Open-Meteo continúa caído o bloqueado para el usuario final. Esto causaba un retraso sistemático de 8 segundos de carga en cada recarga o búsqueda mientras la app esperaba el timeout de la API principal antes de pasar al respaldo.
+  * **Solución**: Se invirtió la prioridad de las APIs de clima en `fetchWeatherData`.
+  * **Nuevo Flujo**:
+    * **API Principal**: **BrightSky (api.brightsky.dev)**. Al ser ahora la principal y tener soporte de CORS nativo, la aplicación vuelve a cargar el clima de forma **instantánea** (menos de 1 segundo).
+    * **API de Respaldo**: **Open-Meteo**. Si BrightSky llegara a fallar, la aplicación intentará de forma transparente cargar datos desde Open-Meteo en segundo plano.
+  * **Exclusión de Caché en sw.js**: Se actualizó el Service Worker (caché **`v16`**) para omitir el almacenamiento dinámico de `api.brightsky.dev`.

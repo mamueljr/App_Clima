@@ -311,38 +311,36 @@ async function fetchWeatherData(lat, lon, cityName) {
   elements.mainContent.classList.add('hidden');
   
   try {
-    // Intentar API Primaria (Open-Meteo)
-    const response = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`, { timeout: 8000 });
+    // Intentar API Primaria (BrightSky - DWD, rápida y con CORS nativo)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextWeekStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    if (!response.ok) throw new Error('API principal de Open-Meteo no disponible');
+    const response = await fetchWithTimeout(`https://api.brightsky.dev/weather?lat=${lat}&lon=${lon}&date=${todayStr}&last_date=${nextWeekStr}`, { timeout: 8000 });
+    
+    if (!response.ok) throw new Error('API principal de BrightSky no disponible');
     
     const data = await response.json();
-    AppState.lastWeatherData = data;
-    renderWeather(data, cityName);
+    const mappedData = mapBrightSkyToOpenMeteo(data, lat, lon);
+    AppState.lastWeatherData = mappedData;
+    renderWeather(mappedData, cityName);
     
     // Ocultar pantalla de carga
     elements.statusMessage.classList.add('hidden');
     elements.mainContent.classList.remove('hidden');
   } catch (primaryError) {
-    console.warn('API Principal (Open-Meteo) falló, intentando API de respaldo (BrightSky)...', primaryError);
+    console.warn('API Principal (BrightSky) falló, intentando API de respaldo (Open-Meteo)...', primaryError);
     
     try {
-      // Calcular rango de fechas para BrightSky (hoy a +7 días en formato YYYY-MM-DD)
-      const todayStr = new Date().toISOString().split('T')[0];
-      const nextWeekStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      // Intentar API de Respaldo (Open-Meteo)
+      const backupResponse = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`, { timeout: 8000 });
       
-      // Intentar API de Respaldo (BrightSky - DWD, compatible con CORS y HTTPS sin llave)
-      const backupResponse = await fetchWithTimeout(`https://api.brightsky.dev/weather?lat=${lat}&lon=${lon}&date=${todayStr}&last_date=${nextWeekStr}`, { timeout: 8000 });
-      
-      if (!backupResponse.ok) throw new Error('API de respaldo de BrightSky no disponible');
+      if (!backupResponse.ok) throw new Error('API de respaldo de Open-Meteo no disponible');
       
       const backupJson = await backupResponse.json();
-      const mappedData = mapBrightSkyToOpenMeteo(backupJson, lat, lon);
+      AppState.lastWeatherData = backupJson;
+      renderWeather(backupJson, cityName);
       
-      AppState.lastWeatherData = mappedData;
-      renderWeather(mappedData, cityName);
-      
-      showToast('Cargados datos de respaldo (BrightSky)', 'info');
+      showToast('Cargados datos de respaldo (Open-Meteo)', 'info');
       
       // Ocultar pantalla de carga
       elements.statusMessage.classList.add('hidden');
