@@ -2,7 +2,7 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v16';
+const CACHE_NAME = 'aura-weather-cache-v17';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

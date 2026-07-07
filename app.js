@@ -356,11 +356,16 @@ async function fetchWeatherData(lat, lon, cityName) {
       elements.statusMessage.innerHTML = `
         <i data-lucide="wifi-off" style="width: 48px; height: 48px; color: #ef4444;"></i>
         <p style="color: #cbd5e1; padding: 0 1rem; text-align: center;">Error: ${errMsg}</p>
-        <button onclick="location.reload()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
+        <button onclick="retryWeatherFetch()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
       `;
       safeCreateIcons();
     }
   }
+}
+
+// Reintenta la carga del clima para la ciudad actual sin recargar la página
+function retryWeatherFetch() {
+  fetchWeatherData(AppState.currentCity.lat, AppState.currentCity.lon, AppState.currentCity.name);
 }
 
 // Convertidor de iconos de BrightSky (Symbol Code) a códigos WMO standard
@@ -422,7 +427,18 @@ function mapBrightSkyToOpenMeteo(brightData, lat, lon) {
     wind_speed_10m: Math.round(currentItem.wind_speed || 0) // En km/h directamente
   };
   
-  // Mapear datos horaria (siguientes 24 horas desde la actual)
+  // Encontrar el índice de la medianoche local de hoy para alinear los índices de las horas
+  const todayDateStr = new Date().toLocaleDateString('en-CA'); // "YYYY-MM-DD" local
+  let midnightIndex = 0;
+  for (let i = 0; i < weather.length; i++) {
+    const d = new Date(weather[i].timestamp);
+    if (d.toLocaleDateString('en-CA') === todayDateStr && d.getHours() === 0) {
+      midnightIndex = i;
+      break;
+    }
+  }
+  
+  // Mapear datos horaria (todas las horas de la semana, comenzando desde la medianoche local de hoy)
   const hourly = {
     time: [],
     temperature_2m: [],
@@ -433,11 +449,16 @@ function mapBrightSkyToOpenMeteo(brightData, lat, lon) {
     uv_index: []
   };
   
-  const startIndex = weather.indexOf(currentItem);
-  const hourlyLimit = Math.min(weather.length, startIndex + 24);
-  for (let i = startIndex; i < hourlyLimit; i++) {
+  for (let i = midnightIndex; i < weather.length; i++) {
     const item = weather[i];
-    hourly.time.push(item.timestamp);
+    // Guardar en formato local YYYY-MM-DDTHH:MM para que el navegador lo parsee en zona horaria local sin desfasamientos
+    const localDate = new Date(item.timestamp);
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    const hour = String(localDate.getHours()).padStart(2, '0');
+    
+    hourly.time.push(`${year}-${month}-${day}T${hour}:00`);
     hourly.temperature_2m.push(item.temperature);
     hourly.relative_humidity_2m.push(item.relative_humidity);
     hourly.apparent_temperature.push(item.temperature);
