@@ -30,7 +30,6 @@
   
   <!-- Fondo animado/dinámico en CSS -->
   <div class="dynamic-background">
-    <div class="cloud-particles"></div>
     <div class="rain-particles"></div>
   </div>
 
@@ -47,7 +46,7 @@
         <div class="search-bar">
           <i data-lucide="search" class="search-icon"></i>
           <input type="text" id="city-search" placeholder="Busca una ciudad (ej. Madrid)..." autocomplete="off">
-          <button id="geo-btn" title="Usar mi ubicación actual">
+          <button id="geo-btn" title="Usar mi ubicación actual" aria-label="Usar mi ubicación actual">
             <i data-lucide="map-pin"></i>
           </button>
         </div>
@@ -57,7 +56,7 @@
       
       <!-- Acciones de Header -->
       <div class="header-actions">
-        <button id="unit-toggle-btn" class="unit-toggle-btn" title="Cambiar a °F">
+        <button id="unit-toggle-btn" class="unit-toggle-btn" title="Cambiar a °F" aria-label="Cambiar a grados Fahrenheit">
           °C
         </button>
         <button id="favorites-toggle-btn" class="favorites-toggle-btn">
@@ -80,8 +79,24 @@
 
     <!-- MENSAJE DE BIENVENIDA / CARGA -->
     <div id="status-message" class="status-message">
-      <div class="spinner"></div>
-      <p>Cargando información del clima...</p>
+      <!-- Skeleton loader: siluetas que insinúan el layout final mientras carga -->
+      <div id="status-loading" class="status-loading">
+        <div class="skeleton-top-grid">
+          <div class="skeleton-card skeleton-lg"></div>
+          <div class="skeleton-card skeleton-lg"></div>
+          <div class="skeleton-card skeleton-lg"></div>
+        </div>
+        <div class="skeleton-metrics-grid">
+          <div class="skeleton-card skeleton-sm"></div>
+          <div class="skeleton-card skeleton-sm"></div>
+          <div class="skeleton-card skeleton-sm"></div>
+          <div class="skeleton-card skeleton-sm"></div>
+        </div>
+        <div class="skeleton-card skeleton-row"></div>
+        <div class="skeleton-card skeleton-chart"></div>
+      </div>
+      <!-- Estado de error: se puebla dinámicamente desde JS si fallan ambas APIs -->
+      <div id="status-error" class="status-error hidden"></div>
     </div>
 
     <!-- CONTENIDO PRINCIPAL DE LA APP (OCULTO DURANTE LA CARGA INICIAL) -->
@@ -95,13 +110,13 @@
           <div class="card-header-actions">
             <span class="location-name" id="weather-location">Madrid, España</span>
             <div class="action-buttons-group">
-              <button id="sound-btn" class="sound-action-btn" title="Activar sonido ambiental">
+              <button id="sound-btn" class="sound-action-btn" title="Activar sonido ambiental" aria-label="Activar sonido ambiental">
                 <i data-lucide="volume-x" class="sound-icon"></i>
               </button>
-              <button id="share-btn" class="share-action-btn" title="Compartir clima">
+              <button id="share-btn" class="share-action-btn" title="Compartir clima" aria-label="Compartir clima">
                 <i data-lucide="share-2" class="share-icon"></i>
               </button>
-              <button id="favorite-btn" class="favorite-action-btn" title="Guardar en favoritos">
+              <button id="favorite-btn" class="favorite-action-btn" title="Guardar en favoritos" aria-label="Guardar en favoritos">
                 <i data-lucide="star" class="star-icon"></i>
               </button>
             </div>

@@ -67,6 +67,8 @@ const elements = {
   favoritesBar: document.getElementById('favorites-bar'),
   favoritesList: document.getElementById('favorites-list'),
   statusMessage: document.getElementById('status-message'),
+  statusLoading: document.getElementById('status-loading'),
+  statusError: document.getElementById('status-error'),
   mainContent: document.getElementById('main-content'),
   weatherLocation: document.getElementById('weather-location'),
   favoriteBtn: document.getElementById('favorite-btn'),
@@ -306,10 +308,12 @@ async function fetchWithTimeout(resource, options = {}) {
 
 // Obtener datos del clima (con soporte de respaldo automático)
 async function fetchWeatherData(lat, lon, cityName) {
-  // Mostrar pantalla de carga
+  // Mostrar pantalla de carga (skeleton) y ocultar cualquier error previo
   elements.statusMessage.classList.remove('hidden');
   elements.mainContent.classList.add('hidden');
-  
+  elements.statusLoading.classList.remove('hidden');
+  elements.statusError.classList.add('hidden');
+
   try {
     // Intentar API Primaria (BrightSky - DWD, rápida y con CORS nativo)
     const todayStr = new Date().toISOString().split('T')[0];
@@ -353,7 +357,9 @@ async function fetchWeatherData(lat, lon, cityName) {
         errMsg = 'Las solicitudes de clima tardaron demasiado en responder (Tiempo de espera agotado)';
       }
       
-      elements.statusMessage.innerHTML = `
+      elements.statusLoading.classList.add('hidden');
+      elements.statusError.classList.remove('hidden');
+      elements.statusError.innerHTML = `
         <i data-lucide="wifi-off" style="width: 48px; height: 48px; color: #ef4444;"></i>
         <p style="color: #cbd5e1; padding: 0 1rem; text-align: center;">Error: ${errMsg}</p>
         <button onclick="retryWeatherFetch()" style="background: var(--theme-accent); color:#0f172a; border:none; padding: 0.6rem 1.2rem; border-radius:12px; cursor:pointer; font-weight:600; margin-top: 10px;">Reintentar</button>
@@ -388,6 +394,17 @@ function brightSkyIconToWmoCode(icon) {
   return mapping[icon] !== undefined ? mapping[icon] : 3;
 }
 
+// Estima la humedad relativa (%) a partir de temperatura y punto de rocío (formula de Magnus-Tetens),
+// necesario porque algunas estaciones de BrightSky no reportan relative_humidity directamente
+function estimateHumidityFromDewPoint(tempC, dewPointC) {
+  if (tempC === null || tempC === undefined || dewPointC === null || dewPointC === undefined) return null;
+  const a = 17.625, b = 243.04;
+  const alphaTemp = (a * tempC) / (b + tempC);
+  const alphaDew = (a * dewPointC) / (b + dewPointC);
+  const rh = 100 * Math.exp(alphaDew - alphaTemp);
+  return Math.round(Math.min(100, Math.max(0, rh)));
+}
+
 // Adaptador para convertir la estructura de BrightSky al formato JSON de Open-Meteo
 function mapBrightSkyToOpenMeteo(brightData, lat, lon) {
   const weather = brightData.weather;
@@ -414,7 +431,9 @@ function mapBrightSkyToOpenMeteo(brightData, lat, lon) {
   // Mapear datos actuales
   const current = {
     temperature_2m: currentItem.temperature,
-    relative_humidity_2m: currentItem.relative_humidity,
+    relative_humidity_2m: (currentItem.relative_humidity !== null && currentItem.relative_humidity !== undefined)
+      ? currentItem.relative_humidity
+      : estimateHumidityFromDewPoint(currentItem.temperature, currentItem.dew_point),
     apparent_temperature: currentItem.temperature, // Aproximado
     is_day: isDay,
     precipitation: currentItem.precipitation || 0,
@@ -460,7 +479,11 @@ function mapBrightSkyToOpenMeteo(brightData, lat, lon) {
     
     hourly.time.push(`${year}-${month}-${day}T${hour}:00`);
     hourly.temperature_2m.push(item.temperature);
-    hourly.relative_humidity_2m.push(item.relative_humidity);
+    hourly.relative_humidity_2m.push(
+      (item.relative_humidity !== null && item.relative_humidity !== undefined)
+        ? item.relative_humidity
+        : estimateHumidityFromDewPoint(item.temperature, item.dew_point)
+    );
     hourly.apparent_temperature.push(item.temperature);
     hourly.precipitation_probability.push(item.precipitation_probability || 0);
     hourly.weather_code.push(brightSkyIconToWmoCode(item.icon));
@@ -576,7 +599,9 @@ function renderWeather(data, cityName) {
   elements.tempMin.textContent = formatTemp(daily.temperature_2m_min[0]);
   
   // 6. Métricas detalladas
-  elements.humidityVal.textContent = `${current.relative_humidity_2m}%`;
+  elements.humidityVal.textContent = (current.relative_humidity_2m !== null && current.relative_humidity_2m !== undefined)
+    ? `${current.relative_humidity_2m}%`
+    : 'N/D';
   elements.windVal.textContent = `${current.wind_speed_10m} km/h`;
   elements.feelsLikeVal.textContent = formatTemp(current.apparent_temperature);
   elements.pressureVal.textContent = `${Math.round(current.pressure_msl)} hPa`;
@@ -1005,6 +1030,7 @@ function toggleTemperatureUnit() {
   if (toggleBtn) {
     toggleBtn.textContent = `°${AppState.unit === 'C' ? 'F' : 'C'}`;
     toggleBtn.title = `Cambiar a °${AppState.unit === 'C' ? 'F' : 'C'}`;
+    toggleBtn.setAttribute('aria-label', `Cambiar a grados ${AppState.unit === 'C' ? 'Fahrenheit' : 'Celsius'}`);
   }
   
   // Actualizar indicador de unidad principal
@@ -1390,10 +1416,12 @@ function toggleAmbientSound() {
     if (isSoundMuted) {
       btn.classList.remove('active');
       btn.title = 'Activar sonido ambiental';
+      btn.setAttribute('aria-label', 'Activar sonido ambiental');
       btn.innerHTML = '<i data-lucide="volume-x" class="sound-icon"></i>';
     } else {
       btn.classList.add('active');
       btn.title = 'Desactivar sonido ambiental';
+      btn.setAttribute('aria-label', 'Desactivar sonido ambiental');
       btn.innerHTML = '<i data-lucide="volume-2" class="sound-icon"></i>';
     }
     safeCreateIcons();
@@ -1646,12 +1674,14 @@ function initSoundButtonState() {
   if (isSoundMuted) {
     btn.classList.remove('active');
     btn.title = 'Activar sonido ambiental';
+    btn.setAttribute('aria-label', 'Activar sonido ambiental');
     btn.innerHTML = '<i data-lucide="volume-x" class="sound-icon"></i>';
   } else {
     btn.classList.add('active');
     btn.title = 'Desactivar sonido ambiental';
+    btn.setAttribute('aria-label', 'Desactivar sonido ambiental');
     btn.innerHTML = '<i data-lucide="volume-2" class="sound-icon"></i>';
-    
+
     // Registrar listener para habilitar AudioContext tras el primer gesto
     const playAudioOnGesture = () => {
       initAudioContext();
