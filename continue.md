@@ -77,3 +77,18 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
     * **API Principal**: **BrightSky (api.brightsky.dev)**. Al ser ahora la principal y tener soporte de CORS nativo, la aplicación vuelve a cargar el clima de forma **instantánea** (menos de 1 segundo).
     * **API de Respaldo**: **Open-Meteo**. Si BrightSky llegara a fallar, la aplicación intentará de forma transparente cargar datos desde Open-Meteo en segundo plano.
   * **Exclusión de Caché en sw.js**: Se actualizó el Service Worker (caché **`v16`**) para omitir el almacenamiento dinámico de `api.brightsky.dev`.
+
+### 7 de Julio de 2026
+* **Pase de pulido estético general**:
+  * **Profundidad de las tarjetas de vidrio**: `.card` ganó un borde superior de realce (`border-top` claro) y una sombra interior sutil, acentuando el efecto de cristal premium.
+  * **Transición cinematográfica entre temas de clima**: los gradientes de fondo se refactorizaron en tres stops de color (`--grad-stop-1/2/3`) registrados vía `@property`, lo que permite que el cambio de un clima a otro haga un verdadero *crossfade* animado en vez de saltar de golpe.
+  * **Ícono principal con vida propia**: el ícono de clima actual ahora flota suavemente y su resplandor pulsa con el color de acento del tema (`iconFloat`).
+  * **Shimmer de carga con tinte de acento**: el efecto shimmer del skeleton loader ahora mezcla `--theme-accent` vía `color-mix()` en vez de un gris neutro fijo.
+  * **Motor de partículas migrado a canvas**: la lluvia y la nieve dejaron de ser `div`s animados por CSS y ahora se dibujan en `#weather-particles-canvas` con velocidad variable y deriva de viento, luciendo más naturales; también se eliminó el efecto de lluvia CSS redundante que quedaba duplicado bajo el sistema anterior.
+  * **Micro-interacciones**: los botones de favorito, compartir y sonido tienen ahora una respuesta táctil al presionar (`:active` con escala), el botón de favorito hace un "pop" elástico al activarse y el de sonido pulsa mientras el audio está activo.
+  * **Tipografía editorial**: la temperatura principal pasó de peso 800 a 300 para un contraste más marcado frente al título de la app.
+  * **Sistema de radios consistente**: se introdujeron los tokens `--radius-sm/md/lg/full` y se unificaron los `border-radius` dispersos (12/16/20/24/9999px) del resto de la hoja de estilos.
+  * **Modo claro**: se añadió soporte `@media (prefers-color-scheme: light)` que aclara el cristal y oscurece el texto en los temas dinámicos (la nieve ya tenía su propio look claro).
+  * **Estado vacío de favoritos**: se añadió un ícono de estrella tenue junto al texto para que no se perciba como un error.
+  * **Accesibilidad de teclado**: se añadieron anillos de `:focus-visible` a botones, inputs y enlaces, a juego con el acento del tema.
+  * **Service Worker**: caché incrementada a **`v20`** para forzar la actualización de todos los usuarios.

@@ -12,6 +12,13 @@ let isSoundMuted = localStorage.getItem('aura_sound_muted') === 'true';
 let currentActiveWeatherCode = null;
 let currentWindSpeed = 0;
 
+// Motor de partículas (lluvia/nieve) en canvas
+let particleCanvas = null;
+let particleCtx = null;
+let particleAnimationId = null;
+let particles = [];
+let particleMode = null; // 'rain' | 'snow' | null
+
 // Estado de la aplicación
 const AppState = {
   currentCity: {
@@ -860,7 +867,13 @@ function renderFavoritesList() {
   elements.favoritesList.innerHTML = '';
   
   if (AppState.favorites.length === 0) {
-    elements.favoritesList.innerHTML = '<p class="no-favorites">No tienes ciudades favoritas guardadas.</p>';
+    elements.favoritesList.innerHTML = `
+      <div class="no-favorites">
+        <i data-lucide="star" class="no-favorites-icon"></i>
+        <p>No tienes ciudades favoritas guardadas.</p>
+      </div>
+    `;
+    safeCreateIcons();
     return;
   }
   
@@ -1080,49 +1093,124 @@ async function shareCurrentWeather() {
 
 // Generación de partículas de clima en el fondo (Lluvia o Nieve)
 function updateWeatherEffects(weatherClass, isDay) {
-  const bg = document.querySelector('.dynamic-background');
-  
-  // Eliminar contenedores anteriores
-  const oldRain = bg.querySelector('.rain-container');
-  const oldSnow = bg.querySelector('.snow-container');
-  if (oldRain) oldRain.remove();
-  if (oldSnow) oldSnow.remove();
+  stopParticles();
 
   // Si es de noche y despejado/nublado, no agregamos lluvia/nieve
   if (isDay === 0 && (weatherClass === 'weather-clear-day' || weatherClass === 'weather-night')) {
     return;
   }
 
-  if (weatherClass === 'weather-rainy' || weatherClass === 'weather-storm') {
-    const container = document.createElement('div');
-    container.className = 'rain-container';
-    
-    // Generar 40 gotas de lluvia individuales
-    for (let i = 0; i < 40; i++) {
-      const drop = document.createElement('div');
-      drop.className = 'drop';
-      drop.style.left = `${Math.random() * 100}%`;
-      drop.style.animationDuration = `${0.5 + Math.random() * 0.5}s`;
-      drop.style.animationDelay = `${Math.random() * 2}s`;
-      container.appendChild(drop);
-    }
-    bg.appendChild(container);
+  if (weatherClass === 'weather-storm') {
+    startRain(130);
+  } else if (weatherClass === 'weather-rainy') {
+    startRain(85);
   } else if (weatherClass === 'weather-snowy') {
-    const container = document.createElement('div');
-    container.className = 'snow-container';
-    
-    // Generar 30 copos de nieve individuales
-    for (let i = 0; i < 30; i++) {
-      const flake = document.createElement('div');
-      flake.className = 'flake';
-      flake.style.left = `${Math.random() * 100}%`;
-      flake.style.width = flake.style.height = `${3 + Math.random() * 4}px`;
-      flake.style.animationDuration = `${3 + Math.random() * 4}s`;
-      flake.style.animationDelay = `${Math.random() * 5}s`;
-      container.appendChild(flake);
-    }
-    bg.appendChild(container);
+    startSnow(70);
   }
+}
+
+function initParticleCanvas() {
+  if (particleCanvas) return true;
+  particleCanvas = document.getElementById('weather-particles-canvas');
+  if (!particleCanvas) return false;
+  particleCtx = particleCanvas.getContext('2d');
+  resizeParticleCanvas();
+  window.addEventListener('resize', resizeParticleCanvas);
+  return true;
+}
+
+function resizeParticleCanvas() {
+  if (!particleCanvas) return;
+  particleCanvas.width = window.innerWidth;
+  particleCanvas.height = window.innerHeight;
+}
+
+function createRainDrop() {
+  return {
+    x: Math.random() * particleCanvas.width,
+    y: Math.random() * -particleCanvas.height,
+    length: 10 + Math.random() * 18,
+    speed: 5 + Math.random() * 7,
+    drift: 1 + Math.random() * 1.8, // deriva por viento
+    opacity: 0.2 + Math.random() * 0.3
+  };
+}
+
+function createSnowFlake() {
+  return {
+    x: Math.random() * particleCanvas.width,
+    y: Math.random() * -particleCanvas.height,
+    radius: 1.5 + Math.random() * 3,
+    speed: 0.5 + Math.random() * 1.4,
+    drift: Math.random() * 1 - 0.5,
+    swaySeed: Math.random() * Math.PI * 2,
+    opacity: 0.4 + Math.random() * 0.5
+  };
+}
+
+function startRain(intensity) {
+  if (!initParticleCanvas()) return;
+  particleMode = 'rain';
+  particles = Array.from({ length: intensity }, createRainDrop);
+  animateParticles();
+}
+
+function startSnow(intensity) {
+  if (!initParticleCanvas()) return;
+  particleMode = 'snow';
+  particles = Array.from({ length: intensity }, createSnowFlake);
+  animateParticles();
+}
+
+function stopParticles() {
+  if (particleAnimationId) {
+    cancelAnimationFrame(particleAnimationId);
+    particleAnimationId = null;
+  }
+  particles = [];
+  particleMode = null;
+  if (particleCtx && particleCanvas) {
+    particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  }
+}
+
+function animateParticles() {
+  if (!particleCtx || !particleCanvas || !particleMode) return;
+  particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+  if (particleMode === 'rain') {
+    particleCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    particleCtx.lineWidth = 1.2;
+    particles.forEach((drop) => {
+      particleCtx.globalAlpha = drop.opacity;
+      particleCtx.beginPath();
+      particleCtx.moveTo(drop.x, drop.y);
+      particleCtx.lineTo(drop.x - drop.drift * 2, drop.y + drop.length);
+      particleCtx.stroke();
+      drop.y += drop.speed;
+      drop.x += drop.drift;
+      if (drop.y > particleCanvas.height) {
+        drop.y = -drop.length;
+        drop.x = Math.random() * particleCanvas.width;
+      }
+    });
+  } else if (particleMode === 'snow') {
+    particleCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    particles.forEach((flake) => {
+      particleCtx.globalAlpha = flake.opacity;
+      particleCtx.beginPath();
+      particleCtx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+      particleCtx.fill();
+      flake.y += flake.speed;
+      flake.x += Math.sin((flake.y + flake.swaySeed) / 40) * 0.6 + flake.drift * 0.2;
+      if (flake.y > particleCanvas.height) {
+        flake.y = -flake.radius;
+        flake.x = Math.random() * particleCanvas.width;
+      }
+    });
+  }
+  particleCtx.globalAlpha = 1;
+  particleAnimationId = requestAnimationFrame(animateParticles);
 }
 
 // ==========================================

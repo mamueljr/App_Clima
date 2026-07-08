@@ -30,7 +30,7 @@
   
   <!-- Fondo animado/dinámico en CSS -->
   <div class="dynamic-background">
-    <div class="rain-particles"></div>
+    <canvas id="weather-particles-canvas" class="weather-particles-canvas"></canvas>
   </div>
 
   <div class="app-container">
@@ -72,7 +72,10 @@
         <h3>Tus Ciudades Guardadas</h3>
         <div id="favorites-list" class="favorites-list">
           <!-- Ciudades favoritas inyectadas por JS -->
-          <p class="no-favorites">No tienes ciudades favoritas guardadas.</p>
+          <div class="no-favorites">
+            <i data-lucide="star" class="no-favorites-icon"></i>
+            <p>No tienes ciudades favoritas guardadas.</p>
+          </div>
         </div>
       </div>
     </section>
