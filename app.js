@@ -7,7 +7,7 @@ let deferredPrompt = null;
 let audioCtx = null;
 let rainSound = null;
 let windSound = null;
-let thunderInterval = null;
+let stormTimeout = null; // temporizador de rayos/truenos durante tormenta
 let isSoundMuted = localStorage.getItem('aura_sound_muted') === 'true';
 let currentActiveWeatherCode = null;
 let currentWindSpeed = 0;
@@ -105,7 +105,8 @@ const elements = {
   moonIlluminationVal: document.getElementById('moon-illumination-val'),
   sunNode: document.getElementById('sun-node'),
   soundBtn: document.getElementById('sound-btn'),
-  hourlyScrollContainer: document.getElementById('hourly-scroll-container')
+  hourlyScrollContainer: document.getElementById('hourly-scroll-container'),
+  themeToggleBtn: document.getElementById('theme-toggle-btn')
 };
 
 // Inicialización al cargar la página
@@ -114,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initApp() {
+  initTheme();
   loadFavorites();
   setupEventListeners();
   initSoundButtonState();
@@ -133,6 +135,67 @@ function initApp() {
   
   // Intentar geolocalización automática en segundo plano
   detectUserLocationAutomatically();
+}
+
+// ==========================================
+// TEMA DE COLOR (auto / claro / oscuro)
+// ==========================================
+const THEME_KEY = 'aura_theme'; // 'auto' | 'light' | 'dark'
+const THEME_ORDER = ['auto', 'light', 'dark'];
+const THEME_META = {
+  auto:  { icon: 'monitor', label: 'Tema: automático' },
+  light: { icon: 'sun',     label: 'Tema: claro' },
+  dark:  { icon: 'moon',    label: 'Tema: oscuro' }
+};
+
+function getStoredTheme() {
+  const t = localStorage.getItem(THEME_KEY);
+  return THEME_ORDER.includes(t) ? t : 'auto';
+}
+
+// Resuelve la preferencia a un valor concreto ('light' | 'dark') para el DOM
+function resolveTheme(pref) {
+  if (pref === 'auto') {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  return pref;
+}
+
+function applyTheme(pref) {
+  const resolved = resolveTheme(pref);
+  document.documentElement.dataset.theme = resolved;
+
+  // La barra del navegador (meta theme-color) acompaña al tema resuelto
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', resolved === 'light' ? '#e2e8f0' : '#0f172a');
+
+  updateThemeButtonIcon(pref);
+}
+
+function updateThemeButtonIcon(pref) {
+  const btn = elements.themeToggleBtn;
+  if (!btn) return;
+  const { icon, label } = THEME_META[pref];
+  btn.innerHTML = `<i data-lucide="${icon}" class="theme-icon"></i>`;
+  btn.setAttribute('title', label);
+  btn.setAttribute('aria-label', label);
+  safeCreateIcons();
+}
+
+function cycleTheme() {
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(getStoredTheme()) + 1) % THEME_ORDER.length];
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+  const names = { auto: 'Automático', light: 'Claro', dark: 'Oscuro' };
+  showToast(`Tema: ${names[next]}`, THEME_META[next].icon);
+}
+
+function initTheme() {
+  applyTheme(getStoredTheme());
+  // En modo automático, seguir en vivo los cambios de tema del sistema
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (getStoredTheme() === 'auto') applyTheme('auto');
+  });
 }
 
 // Configuración de eventos
@@ -174,6 +237,11 @@ function setupEventListeners() {
   // Cambio de unidades
   if (elements.unitToggleBtn) {
     elements.unitToggleBtn.addEventListener('click', toggleTemperatureUnit);
+  }
+
+  // Cambio de tema (auto / claro / oscuro)
+  if (elements.themeToggleBtn) {
+    elements.themeToggleBtn.addEventListener('click', cycleTheme);
   }
 
   // Compartir clima
@@ -314,56 +382,70 @@ async function fetchWithTimeout(resource, options = {}) {
 }
 
 // Obtener datos del clima (con soporte de respaldo automático)
-async function fetchWeatherData(lat, lon, cityName) {
-  // Mostrar pantalla de carga (skeleton) y ocultar cualquier error previo
-  elements.statusMessage.classList.remove('hidden');
-  elements.mainContent.classList.add('hidden');
-  elements.statusLoading.classList.remove('hidden');
-  elements.statusError.classList.add('hidden');
+async function fetchWeatherData(lat, lon, cityName, options = {}) {
+  // Refresco en silencio: cuando ya hay clima en pantalla (p. ej. la actualización
+  // automática por GPS), no ocultamos el contenido ni mostramos el skeleton; solo
+  // sustituimos los datos al llegar. Así se evita el "parpadeo" de recarga.
+  const silent = options.silent && AppState.lastWeatherData && !elements.mainContent.classList.contains('hidden');
+
+  if (!silent) {
+    // Mostrar pantalla de carga (skeleton) y ocultar cualquier error previo
+    elements.statusMessage.classList.remove('hidden');
+    elements.mainContent.classList.add('hidden');
+    elements.statusLoading.classList.remove('hidden');
+    elements.statusError.classList.add('hidden');
+  }
 
   try {
     // Intentar API Primaria (BrightSky - DWD, rápida y con CORS nativo)
     const todayStr = new Date().toISOString().split('T')[0];
     const nextWeekStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
+
     const response = await fetchWithTimeout(`https://api.brightsky.dev/weather?lat=${lat}&lon=${lon}&date=${todayStr}&last_date=${nextWeekStr}`, { timeout: 8000 });
-    
+
     if (!response.ok) throw new Error('API principal de BrightSky no disponible');
-    
+
     const data = await response.json();
     const mappedData = mapBrightSkyToOpenMeteo(data, lat, lon);
     AppState.lastWeatherData = mappedData;
     renderWeather(mappedData, cityName);
-    
+
     // Ocultar pantalla de carga
     elements.statusMessage.classList.add('hidden');
     elements.mainContent.classList.remove('hidden');
   } catch (primaryError) {
     console.warn('API Principal (BrightSky) falló, intentando API de respaldo (Open-Meteo)...', primaryError);
-    
+
     try {
       // Intentar API de Respaldo (Open-Meteo)
       const backupResponse = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto`, { timeout: 8000 });
-      
+
       if (!backupResponse.ok) throw new Error('API de respaldo de Open-Meteo no disponible');
-      
+
       const backupJson = await backupResponse.json();
       AppState.lastWeatherData = backupJson;
       renderWeather(backupJson, cityName);
-      
+
       showToast('Cargados datos de respaldo (Open-Meteo)', 'info');
-      
+
       // Ocultar pantalla de carga
       elements.statusMessage.classList.add('hidden');
       elements.mainContent.classList.remove('hidden');
     } catch (backupError) {
       console.error('Ambas APIs de clima fallaron:', backupError);
-      
+
+      // En un refresco silencioso conservamos el clima que ya se ve en pantalla
+      // en lugar de reemplazarlo por la pantalla de error.
+      if (silent) {
+        showToast('No se pudo actualizar el clima local', 'wifi-off');
+        return;
+      }
+
       let errMsg = 'Ambas APIs de clima fallaron (Servicios no disponibles)';
       if (backupError.name === 'AbortError') {
         errMsg = 'Las solicitudes de clima tardaron demasiado en responder (Tiempo de espera agotado)';
       }
-      
+
       elements.statusLoading.classList.add('hidden');
       elements.statusError.classList.remove('hidden');
       elements.statusError.innerHTML = `
@@ -981,13 +1063,18 @@ function showToast(message, iconName = 'info') {
 // Intentar obtener la ubicación real al inicio de forma silenciosa
 function detectUserLocationAutomatically() {
   if (!navigator.geolocation) return;
-  
+
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       const { latitude, longitude } = position.coords;
-      
-      showToast('Ubicación detectada. Actualizando clima local...', 'map-pin');
-      
+
+      // Si el GPS resuelve a la MISMA ubicación que ya está cargada (caso típico:
+      // el usuario vuelve a abrir la app en el mismo sitio), no hay nada que hacer.
+      // Evitamos el recargón redundante que reaparecía el skeleton en cada apertura.
+      if (isSameLocation({ lat: latitude, lon: longitude }, AppState.currentCity)) {
+        return;
+      }
+
       let cityName = 'Tu Ubicación';
       try {
         const response = await fetchWithTimeout(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=es`, { timeout: 4000 });
@@ -998,10 +1085,14 @@ function detectUserLocationAutomatically() {
       } catch (err) {
         console.warn('Error al resolver nombre de ubicación inicial', err);
       }
-      
+
+      showToast('Ubicación detectada. Actualizando clima local...', 'map-pin');
+
       AppState.currentCity = { name: cityName, lat: latitude, lon: longitude };
       localStorage.setItem('aura_last_city', JSON.stringify(AppState.currentCity));
-      fetchWeatherData(latitude, longitude, cityName);
+      // Refresco en silencio: si ya hay clima en pantalla, se cambian los datos
+      // en su lugar sin volver a mostrar el skeleton de carga.
+      fetchWeatherData(latitude, longitude, cityName, { silent: true });
     },
     (error) => {
       console.warn('Geolocalización automática denegada o fallida:', error);
@@ -1092,21 +1183,74 @@ async function shareCurrentWeather() {
 }
 
 // Generación de partículas de clima en el fondo (Lluvia o Nieve)
+// ¿El usuario prefiere movimiento reducido? Se consulta en vivo por si cambia.
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function updateWeatherEffects(weatherClass, isDay) {
   stopParticles();
+  stopStormEffects();
+
+  const reduce = prefersReducedMotion();
+
+  // La tormenta siempre dispara rayos/truenos (el destello se omite si hay
+  // movimiento reducido; el trueno de audio se mantiene).
+  if (weatherClass === 'weather-storm') {
+    if (!reduce) startRain(130);
+    startStormEffects();
+    return;
+  }
 
   // Si es de noche y despejado/nublado, no agregamos lluvia/nieve
   if (isDay === 0 && (weatherClass === 'weather-clear-day' || weatherClass === 'weather-night')) {
     return;
   }
 
-  if (weatherClass === 'weather-storm') {
-    startRain(130);
-  } else if (weatherClass === 'weather-rainy') {
+  // Con movimiento reducido no dibujamos partículas
+  if (reduce) return;
+
+  if (weatherClass === 'weather-rainy') {
     startRain(85);
   } else if (weatherClass === 'weather-snowy') {
     startSnow(70);
   }
+}
+
+// ==========================================
+// RAYOS + TRUENOS SINCRONIZADOS (TORMENTA)
+// ==========================================
+
+function startStormEffects() {
+  stopStormEffects();
+  const strike = () => {
+    triggerLightning();
+    // Siguiente rayo en un intervalo irregular (6–18 s)
+    stormTimeout = setTimeout(strike, 6000 + Math.random() * 12000);
+  };
+  // Primer rayo poco después de cargar el clima
+  stormTimeout = setTimeout(strike, 2500 + Math.random() * 2500);
+}
+
+function stopStormEffects() {
+  if (stormTimeout) {
+    clearTimeout(stormTimeout);
+    stormTimeout = null;
+  }
+}
+
+function triggerLightning() {
+  // Destello visual (se omite con movimiento reducido)
+  const flash = document.getElementById('lightning-flash');
+  if (flash && !prefersReducedMotion()) {
+    flash.classList.remove('flashing');
+    void flash.offsetWidth; // reinicia la animación forzando un reflow
+    flash.classList.add('flashing');
+  }
+  // El trueno llega un instante después (la luz viaja más rápido que el sonido).
+  // playThunder() ya verifica que exista audioCtx y que el sonido no esté silenciado.
+  const thunderDelay = 300 + Math.random() * 1200;
+  setTimeout(playThunder, thunderDelay);
 }
 
 function initParticleCanvas() {
@@ -1541,14 +1685,12 @@ function updateAmbientSound(weatherCode, windSpeed) {
 function applyAudioState() {
   if (!audioCtx) return;
   
-  // Si está silenciado, apagar todos los sonidos suavemente y pausar
+  // Si está silenciado, apagar todos los sonidos suavemente y pausar.
+  // (Los rayos/truenos los gobierna el temporizador de tormenta, que ya
+  //  verifica el estado de silencio en cada descarga.)
   if (isSoundMuted) {
     stopRainSound();
     stopWindSound();
-    if (thunderInterval) {
-      clearInterval(thunderInterval);
-      thunderInterval = null;
-    }
     return;
   }
   
@@ -1566,20 +1708,9 @@ function applyAudioState() {
     stopRainSound();
   }
   
-  // Manejar Tormenta (Truenos periódicos)
-  if (isStormy) {
-    if (!thunderInterval) {
-      // Tocar un trueno inicial y luego cada 15-25 segundos
-      setTimeout(playThunder, 2000);
-      thunderInterval = setInterval(playThunder, 20000);
-    }
-  } else {
-    if (thunderInterval) {
-      clearInterval(thunderInterval);
-      thunderInterval = null;
-    }
-  }
-  
+  // Los truenos ya no se agendan aquí: los dispara startStormEffects() junto
+  // con el destello del rayo para que luz y sonido queden sincronizados.
+
   // Manejar Sonido de Viento
   if (isWindy && !isRainy && !isStormy) {
     startWindSound(Math.min(0.15, wind / 250));

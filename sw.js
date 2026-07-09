@@ -2,13 +2,14 @@
  * AuraWeather Service Worker for PWA
  */
 
-const CACHE_NAME = 'aura-weather-cache-v20';
+const CACHE_NAME = 'aura-weather-cache-v24';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
+  './assets/favicon.svg',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png'
 ];
@@ -26,6 +27,10 @@ self.addEventListener('install', (event) => {
 });
 
 // Evento Activate: Limpiar cachés antiguas
+// Nota: NO usamos self.clients.claim(). Reclamar el control en la primera carga
+// (aún sin controlador) dispara un 'controllerchange' que provocaba una recarga
+// espuria justo tras instalar la PWA. En una actualización real la página ya está
+// controlada, así que SKIP_WAITING + controllerchange siguen recargando bien.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -37,7 +42,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    })
   );
 });
 

@@ -92,3 +92,34 @@ La aplicación destaca por sus efectos visuales climatológicos dinámicos en vi
   * **Estado vacío de favoritos**: se añadió un ícono de estrella tenue junto al texto para que no se perciba como un error.
   * **Accesibilidad de teclado**: se añadieron anillos de `:focus-visible` a botones, inputs y enlaces, a juego con el acento del tema.
   * **Service Worker**: caché incrementada a **`v20`** para forzar la actualización de todos los usuarios.
+
+### 8 de Julio de 2026
+* **Bloque de pulido estético (Prioridad 1)**:
+  * **Relámpago sincronizado con el trueno**: se añadió un overlay `#lightning-flash` en el fondo que hace un doble parpadeo irregular (`lightningStrike`) al ritmo de un temporizador de tormenta (`startStormEffects`/`triggerLightning`). La luz llega primero y el trueno de audio poco después (300–1500 ms), replicando la física real. El agendado de truenos se movió de `applyAudioState` al temporizador de tormenta para que luz y sonido queden acoplados; el destello se ve aunque el sonido esté silenciado.
+  * **Rebalanceo de acentos apagados**: `--theme-accent` de *nublado* pasó de `#94a3b8` a `#60a5fa` y el de *noche* de `#a5b4fc` a `#818cf8`, para que todos los temas tengan el mismo "pop" que soleado y tormenta.
+  * **Accesibilidad — movimiento reducido**: nuevo bloque `@media (prefers-color-scheme: reduce)` que desactiva animaciones decorativas, flotación del ícono, shimmer y el destello; en `app.js`, `prefersReducedMotion()` omite las partículas y el flash (el trueno de audio se conserva).
+  * **Scrollbar global**: la barra de desplazamiento de toda la página ahora es fina y se tiñe con el acento del tema (`::-webkit-scrollbar` + `scrollbar-color`), a juego con la del carrusel horario.
+  * **Entrada escalonada de tarjetas**: cada bloque de `.main-content` aparece con un ligero retraso incremental (`cardEnter`, 50–330 ms) para una entrada más orquestada que el fade simultáneo anterior.
+  * **Service Worker**: caché incrementada a **`v21`**.
+* **Fondo por capas de ambiente (Prioridad 2, #7)**:
+  * Se añadieron tres capas decorativas puramente en CSS dentro de `.dynamic-background` (`.bg-stars`, `.bg-sun`, `.bg-clouds`), colocadas detrás de las partículas (`z-index: -2`) y reveladas con un fundido de 1.2s según la clase de clima del `body`.
+  * **Estrellas (noche)**: dos capas de estrellas (`::before`/`::after`) con distinta densidad y ritmo de titileo (`twinkle`), creando un parallax sutil de brillo.
+  * **Halo de sol (soleado de día)**: un resplandor cálido radial en la esquina superior que "respira" con una animación de escala/brillo (`sunBreathe`).
+  * **Nubes (nublado y tormenta)**: blobs suaves que se desplazan horizontalmente en bucle lento de 90s (`cloudDrift`); en tormenta aparecen atenuadas al 70%.
+  * Todas las capas se congelan (sin titileo/deriva/respiración) bajo `prefers-reduced-motion`, permaneciendo visibles pero estáticas.
+  * **Service Worker**: caché incrementada a **`v22`**.
+* **Corrección del "doble arranque" al abrir la app (recarga fantasma)**:
+  * **Síntoma**: al abrir la PWA cargaba, mostraba el clima y anunciaba "ubicación detectada", y segundos después repetía todo el proceso (reaparecía el skeleton) de forma redundante.
+  * **Causa 1 (principal)**: el arranque en dos fases (`initApp` carga la última ciudad → `detectUserLocationAutomatically` re-consulta el GPS) llamaba a `fetchWeatherData` una segunda vez **aunque la ubicación fuera la misma** ya cargada, y esa segunda llamada siempre reponía el skeleton completo.
+  * **Fix 1**: `detectUserLocationAutomatically` ahora compara con `isSameLocation` y, si el GPS resuelve a la misma ubicación que ya está en pantalla, **no hace nada** (sin toast ni refetch).
+  * **Fix 2**: `fetchWeatherData` acepta `options.silent`. Cuando ya hay clima renderizado (caso de la actualización automática por GPS a otra ubicación), sustituye los datos en su lugar **sin ocultar el contenido ni mostrar el skeleton**; y ante un fallo silencioso conserva el clima visible en vez de pintar la pantalla de error.
+  * **Causa 2 (secundaria)**: `sw.js` usaba `self.clients.claim()` en `activate`, que en la primera carga (sin controlador) disparaba un `controllerchange` → `window.location.reload()` espurio tras instalar/actualizar.
+  * **Fix 3**: se eliminó `clients.claim()`. Las actualizaciones reales siguen recargando vía `SKIP_WAITING` + `controllerchange` (la página ya está controlada), pero desaparece el recargón de la primera apertura.
+  * **Service Worker**: caché incrementada a **`v23`**.
+* **Lote final de mejoras estéticas (Prioridad 2, #5, #6, #8, #9, #10)**:
+  * **#5 Tipografía "hero"**: la temperatura principal pasó a 6.5rem con peso 200 y tracking negativo (`-0.04em`); la unidad se redujo a superíndice (1.6rem, peso 500) para un contraste editorial marcado. Ajustados los tamaños en móvil (5rem) y landscape (4.5rem).
+  * **#6 Icono de clima a color**: el icono principal ya no usa un único acento; ahora toma un color propio por clima vía `--icon-color` (sol dorado, nube plateada, lluvia azul, nieve celeste, luna índigo, rayo ámbar). En modo claro se sustituyen los tonos pálidos por versiones más saturadas para conservar el contraste sobre el cristal luminoso.
+  * **#8 Toggle manual de tema**: nuevo botón en el header que cicla **auto → claro → oscuro** (iconos `monitor`/`sun`/`moon`), con persistencia en `localStorage` (`aura_theme`). El JS resuelve la preferencia y fija `data-theme` en `<html>`; el modo claro se refactorizó de `@media (prefers-color-scheme)` a selectores `:root[data-theme="light"]`, y en modo *auto* se sigue en vivo el cambio del sistema vía `matchMedia`. La barra del navegador (`meta[theme-color]`) acompaña al tema.
+  * **#9 Marca propia + favicon**: se reemplazó el logo genérico `cloud-sun` de Lucide por una marca SVG inline ("orbe de aura" con anillos y gradiente cálido→frío); se añadió `assets/favicon.svg` con la misma identidad y su `<link rel="icon">`.
+  * **#10 Modo landscape compacto**: nuevo `@media (orientation: landscape) and (max-height: 500px)` que colapsa cabecera, logo, tipografía y paddings para aprovechar la poca altura en teléfonos en horizontal.
+  * **Service Worker**: caché incrementada a **`v24`** y `favicon.svg` añadido al precache.

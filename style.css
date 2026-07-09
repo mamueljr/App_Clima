@@ -80,6 +80,27 @@ body {
   background: #090d16;
   position: relative;
   transition: var(--transition-smooth);
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-accent) transparent;
+}
+
+/* Scrollbar global fina y a juego con el acento del tema (WebKit/Blink) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--theme-accent) 55%, transparent);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-accent);
+  background-clip: padding-box;
 }
 
 /* TEMAS METEOROLÓGICOS DINÁMICOS */
@@ -98,7 +119,7 @@ body.weather-cloudy {
   --grad-stop-1: #1e293b;
   --grad-stop-2: #475569;
   --grad-stop-3: #64748b;
-  --theme-accent: #94a3b8;
+  --theme-accent: #60a5fa;
   --glass-bg: rgba(30, 41, 59, 0.3);
   --glass-border: rgba(255, 255, 255, 0.1);
 }
@@ -131,7 +152,7 @@ body.weather-night {
   --grad-stop-1: #020617;
   --grad-stop-2: #0f172a;
   --grad-stop-3: #1e293b;
-  --theme-accent: #a5b4fc;
+  --theme-accent: #818cf8;
   --glass-bg: rgba(2, 6, 23, 0.4);
   --glass-border: rgba(255, 255, 255, 0.05);
 }
@@ -146,30 +167,30 @@ body.weather-storm {
   --glass-border: rgba(250, 204, 21, 0.15);
 }
 
-/* Modo claro: cristal más luminoso y texto oscuro cuando el sistema prefiere tema claro.
+/* Modo claro: cristal más luminoso y texto oscuro. Se activa cuando el usuario
+   elige "claro" o cuando está en "auto" y el sistema prefiere claro; en ambos
+   casos el JS resuelve la preferencia y fija data-theme="light" en <html>.
    La nieve ya nace con un look claro propio, así que se excluye de este ajuste. */
-@media (prefers-color-scheme: light) {
-  body.weather-clear-day,
-  body.weather-cloudy,
-  body.weather-rainy,
-  body.weather-night,
-  body.weather-storm {
-    --glass-bg: rgba(255, 255, 255, 0.55);
-    --glass-border: rgba(15, 23, 42, 0.1);
-    --glass-highlight: rgba(15, 23, 42, 0.08);
-    --text-primary: #0f172a;
-    --text-secondary: #1e293b;
-    --text-muted: #475569;
-  }
+:root[data-theme="light"] body.weather-clear-day,
+:root[data-theme="light"] body.weather-cloudy,
+:root[data-theme="light"] body.weather-rainy,
+:root[data-theme="light"] body.weather-night,
+:root[data-theme="light"] body.weather-storm {
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --glass-highlight: rgba(15, 23, 42, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #1e293b;
+  --text-muted: #475569;
+}
 
-  .search-results {
-    background: rgba(248, 250, 252, 0.92);
-  }
+:root[data-theme="light"] .search-results {
+  background: rgba(248, 250, 252, 0.92);
+}
 
-  .toast {
-    background: rgba(255, 255, 255, 0.92);
-    color: #0f172a;
-  }
+:root[data-theme="light"] .toast {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
 }
 
 /* FONDO DINÁMICO CON EFECTOS DE PARTÍCULAS */
@@ -192,6 +213,125 @@ body.weather-storm {
   height: 100%;
   z-index: -1;
   pointer-events: none;
+}
+
+/* CAPAS DE AMBIENTE DEL FONDO (estrellas, sol, nubes) — puro CSS.
+   Cada capa se revela con un fundido según la clase de clima del body y se
+   coloca detrás de las partículas (z-index -2) y del gradiente base. */
+.bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+/* --- Estrellas (noche) --- */
+body.weather-night .bg-stars {
+  opacity: 1;
+}
+.bg-stars::before,
+.bg-stars::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+}
+/* Capa densa de estrellas pequeñas que titilan */
+.bg-stars::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 25px 30px, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 80px 120px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 160px 60px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 200px 180px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 120px 210px, rgba(255,255,255,0.75), transparent);
+  background-size: 250px 250px;
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+/* Segunda capa más dispersa, con brillo y ritmo distintos (parallax de titileo) */
+.bg-stars::after {
+  background-image:
+    radial-gradient(2px 2px at 60px 90px, rgba(199,210,254,0.9), transparent),
+    radial-gradient(1.5px 1.5px at 180px 30px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 300px 150px, rgba(255,255,255,0.6), transparent);
+  background-size: 360px 360px;
+  animation: twinkle 6s ease-in-out infinite alternate-reverse;
+}
+@keyframes twinkle {
+  from { opacity: 0.35; }
+  to   { opacity: 1; }
+}
+
+/* --- Halo de sol (soleado de día) --- */
+body.weather-clear-day .bg-sun {
+  opacity: 1;
+}
+.bg-sun {
+  background:
+    radial-gradient(circle 200px at 82% 16%,
+      rgba(255,240,190,0.55) 0%,
+      rgba(255,214,120,0.20) 42%,
+      transparent 70%);
+  animation: sunBreathe 8s ease-in-out infinite;
+}
+@keyframes sunBreathe {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50%      { transform: scale(1.08); filter: brightness(1.15); }
+}
+
+/* --- Nubes a la deriva (nublado y tormenta) --- */
+body.weather-cloudy .bg-clouds {
+  opacity: 1;
+}
+body.weather-storm .bg-clouds {
+  opacity: 0.7;
+}
+.bg-clouds {
+  background-image:
+    radial-gradient(ellipse 45% 22% at 20% 25%, rgba(255,255,255,0.10), transparent 60%),
+    radial-gradient(ellipse 55% 26% at 70% 40%, rgba(255,255,255,0.08), transparent 60%),
+    radial-gradient(ellipse 38% 20% at 45% 62%, rgba(255,255,255,0.06), transparent 60%);
+  background-repeat: repeat-x;
+  background-size: 60% auto, 48% auto, 72% auto;
+  animation: cloudDrift 90s linear infinite;
+}
+@keyframes cloudDrift {
+  from { background-position: 0% 22%, 0% 40%, 0% 62%; }
+  to   { background-position: 100% 22%, 100% 40%, 100% 62%; }
+}
+
+/* DESTELLO DE RELÁMPAGO (tormenta) — se sincroniza con el trueno vía JS */
+.lightning-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% 30%,
+    rgba(226, 232, 240, 0.9) 0%,
+    rgba(165, 180, 252, 0.35) 40%,
+    transparent 75%
+  );
+}
+
+.lightning-flash.flashing {
+  animation: lightningStrike 0.9s ease-out;
+}
+
+/* Doble parpadeo irregular, como un rayo real */
+@keyframes lightningStrike {
+  0%   { opacity: 0; }
+  4%   { opacity: 0.85; }
+  8%   { opacity: 0.15; }
+  12%  { opacity: 0.95; }
+  20%  { opacity: 0.1; }
+  26%  { opacity: 0.55; }
+  100% { opacity: 0; }
 }
 
 /* CONTENEDOR DE LA APLICACIÓN */
@@ -388,6 +528,38 @@ body.weather-storm {
 .unit-toggle-btn:hover {
   background: var(--glass-highlight);
   border-color: var(--theme-accent);
+}
+
+/* BOTÓN DE TEMA (auto / claro / oscuro) */
+.theme-toggle-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--glass-highlight);
+  border-color: var(--theme-accent);
+  color: var(--theme-accent);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.9);
+}
+
+.theme-toggle-btn .theme-icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* BOTÓN DE FAVORITOS */
@@ -613,11 +785,26 @@ body.weather-storm {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  animation: fadeIn 0.5s ease-out;
+  animation: fadeIn 0.4s ease-out;
 }
 
 .main-content.hidden {
   display: none;
+}
+
+/* Entrada escalonada de cada bloque para una aparición más orquestada */
+.main-content > * {
+  animation: cardEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.main-content > *:nth-child(1) { animation-delay: 0.05s; }
+.main-content > *:nth-child(2) { animation-delay: 0.12s; }
+.main-content > *:nth-child(3) { animation-delay: 0.19s; }
+.main-content > *:nth-child(4) { animation-delay: 0.26s; }
+.main-content > *:nth-child(5) { animation-delay: 0.33s; }
+
+@keyframes cardEnter {
+  0% { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* GRID SUPERIOR */
@@ -729,20 +916,22 @@ body.weather-storm {
 
 .current-temp {
   font-family: var(--font-title);
-  font-weight: 300;
-  font-size: 5rem;
-  line-height: 1;
-  background: linear-gradient(180deg, var(--text-primary) 60%, var(--text-secondary) 100%);
+  font-weight: 200;
+  font-size: 6.5rem;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  background: linear-gradient(180deg, var(--text-primary) 55%, var(--text-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .temp-unit {
   font-family: var(--font-title);
-  font-weight: 600;
-  font-size: 2rem;
+  font-weight: 500;
+  font-size: 1.6rem;
   color: var(--theme-accent);
-  margin-top: 0.5rem;
+  margin-top: 0.6rem; /* alinea como superíndice respecto al número gigante */
+  opacity: 0.9;
 }
 
 .weather-icon-description {
@@ -755,14 +944,30 @@ body.weather-storm {
 .main-weather-icon {
   width: 72px;
   height: 72px;
-  color: var(--theme-accent);
+  color: var(--icon-color, var(--theme-accent));
   filter: drop-shadow(0 0 16px rgba(255,255,255,0.15));
   animation: iconFloat 4s ease-in-out infinite;
 }
 
+/* Color propio del icono principal según el clima, para que no se vea genérico
+   (sol dorado, nube plateada, lluvia azul, nieve helada, luna índigo, rayo ámbar) */
+body.weather-clear-day { --icon-color: #fbbf24; }
+body.weather-cloudy    { --icon-color: #e2e8f0; }
+body.weather-rainy     { --icon-color: #60a5fa; }
+body.weather-snowy     { --icon-color: #38bdf8; }
+body.weather-night     { --icon-color: #c7d2fe; }
+body.weather-storm     { --icon-color: #fde047; }
+
+/* En modo claro, los tonos muy pálidos se pierden sobre el cristal luminoso:
+   se sustituyen por versiones más saturadas para conservar el contraste. */
+:root[data-theme="light"] body.weather-clear-day { --icon-color: #f59e0b; }
+:root[data-theme="light"] body.weather-cloudy    { --icon-color: #64748b; }
+:root[data-theme="light"] body.weather-night     { --icon-color: #6366f1; }
+:root[data-theme="light"] body.weather-storm     { --icon-color: #ca8a04; }
+
 @keyframes iconFloat {
   0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 16px rgba(255,255,255,0.15)); }
-  50% { transform: translateY(-6px); filter: drop-shadow(0 0 22px var(--theme-accent)); }
+  50% { transform: translateY(-6px); filter: drop-shadow(0 0 22px var(--icon-color, var(--theme-accent))); }
 }
 
 .weather-desc {
@@ -1372,9 +1577,9 @@ body.weather-storm {
   }
   
   .current-temp {
-    font-size: 4rem;
+    font-size: 5rem;
   }
-  
+
   .main-weather-icon {
     width: 60px;
     height: 60px;
@@ -1383,11 +1588,92 @@ body.weather-storm {
   .metrics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .forecast-row {
     grid-template-columns: 2.8fr 3fr 2.2fr; /* Más espacio para los nombres de días en pantallas angostas */
     padding: 0.75rem 0.5rem; /* Menor padding lateral para aprovechar el ancho */
   }
 }
 
+/* MODO HORIZONTAL COMPACTO (teléfono en landscape, poca altura vertical).
+   Colapsa cabecera y espaciados para que quepa más contenido sin tanto scroll. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-container {
+    padding: 0.75rem 1.25rem;
+    gap: 1rem;
+  }
+
+  .app-header {
+    margin-bottom: 0;
+    gap: 1rem;
+  }
+
+  .logo-area h1 {
+    font-size: 1.2rem;
+  }
+
+  .logo-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .current-temp {
+    font-size: 4.5rem;
+  }
+
+  .weather-main-display {
+    margin-bottom: 1rem;
+  }
+
+  .local-time {
+    margin-bottom: 1rem;
+  }
+
+  .card {
+    padding: 1.1rem;
+  }
+
+  .app-footer {
+    padding: 0.75rem 0;
+  }
+}
+
 /* La lluvia y la nieve se dibujan en #weather-particles-canvas (ver app.js) */
+
+/* ACCESIBILIDAD: respetar la preferencia de movimiento reducido.
+   Desactiva animaciones decorativas, flotación del ícono, shimmer, destellos
+   y el crossfade de fondo. Las partículas y el relámpago se omiten desde app.js. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .main-weather-icon,
+  .sound-action-btn.active,
+  .skeleton-card {
+    animation: none !important;
+  }
+
+  .main-content > * {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .lightning-flash {
+    display: none !important;
+  }
+
+  /* Las capas de ambiente se muestran estáticas (sin titileo/deriva/respiración) */
+  .bg-stars::before,
+  .bg-stars::after,
+  .bg-sun,
+  .bg-clouds {
+    animation: none !important;
+  }
+}

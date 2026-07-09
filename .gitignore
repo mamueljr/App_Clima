@@ -19,3 +19,6 @@ android/.idea/
 # OS/System files
 .DS_Store
 Thumbs.db
+
+# Local tooling (Claude Code config local: permisos, preview, etc.)
+.claude/
